@@ -1,7 +1,6 @@
 using System;
 using System.Reflection;
 using HarmonyLib;
-using UnityEngine;
 
 namespace LobCorpWeaponExpansion
 {
@@ -10,8 +9,7 @@ namespace LobCorpWeaponExpansion
         private static readonly FieldInfo CurrentWeaponSwingField =
             AccessTools.Field(
                 typeof(WeaponControllerSimple),
-                "currentWeaponSwing"
-            );
+                "currentWeaponSwing");
 
         internal static bool IsTarget(WeaponSimple weapon)
         {
@@ -24,18 +22,23 @@ namespace LobCorpWeaponExpansion
         internal static int GetCurrentSwing(
             WeaponControllerSimple owner)
         {
-            if (owner == null || CurrentWeaponSwingField == null)
+            if (owner == null ||
+                CurrentWeaponSwingField == null)
+            {
                 return -1;
+            }
 
-            object value = CurrentWeaponSwingField.GetValue(owner);
+            object value =
+                CurrentWeaponSwingField.GetValue(owner);
 
-            return value == null ? -1 : Convert.ToInt32(value);
+            return value == null
+                ? -1
+                : Convert.ToInt32(value);
         }
     }
 
     /// <summary>
-    /// 在武器初始化时切换到双武器动画层，
-    /// 并扩展普通攻击数据以对应 Twin 动画的六个事件索引。
+    /// 初始化双锤动画层，并将普通攻击数据扩展为六个事件索引。
     /// </summary>
     [HarmonyPatch]
     internal static class RedEyeConfessionTwinInitializePatch
@@ -44,25 +47,30 @@ namespace LobCorpWeaponExpansion
         {
             return AccessTools.Method(
                 typeof(WeaponSimple),
-                "Initialize"
-            );
+                "Initialize");
         }
 
         [HarmonyPrefix]
         private static void Prefix(WeaponSimple __instance)
         {
             if (!RedEyeConfessionTwinComboHelper.IsTarget(__instance))
+            {
                 return;
+            }
 
-            // Twin 攻击动画存在于第 2 层。
+            // 双锤攻击动画使用第 2 层。
             __instance.animatorLayer = 2;
-            // 测试双锤专用的动画招式组
+
+            // 使用双锤专用动画招式组。
             __instance.attackMoveSet = 0;
 
             NewWeaponFireData[] original =
                 __instance.basicComboAttacks;
 
-            // 只扩展一次，避免反复初始化时错误地重排数据。
+            // 原版三段攻击扩展为六个动画事件索引：
+            // 0、1 对应第一段；
+            // 2、3 对应第二段；
+            // 4、5 对应第三段。
             if (original != null &&
                 original.Length >= 3 &&
                 original.Length < 6)
@@ -81,20 +89,13 @@ namespace LobCorpWeaponExpansion
 
                 __instance.basicComboAttacks = comboData;
             }
-
-            Debug.Log(
-                $"[脑叶武器扩展][双锤] " +
-                $"AnimatorLayer={__instance.animatorLayer}, " +
-                $"AttackMoveSet={__instance.attackMoveSet}, " +
-                $"BasicCount={__instance.basicComboAttacks?.Length ?? 0}"
-                );
         }
     }
 
     /// <summary>
-    /// Twin Attack1：仅保留索引 0 的攻击事件。
-    /// Twin Attack2：仅保留索引 2 的攻击事件。
-    /// Twin Attack3：保留索引 4、5 两次同时发生的攻击事件。
+    /// 第一段仅执行索引 0；
+    /// 第二段仅执行索引 2；
+    /// 第三段保留索引 4 和 5。
     /// </summary>
     [HarmonyPatch]
     internal static class RedEyeConfessionTwinAttackEventPatch
@@ -103,8 +104,7 @@ namespace LobCorpWeaponExpansion
         {
             return AccessTools.Method(
                 typeof(WeaponSimple),
-                "CreateBasicAttackProjectile"
-            );
+                "CreateBasicAttackProjectile");
         }
 
         [HarmonyPrefix]
@@ -113,7 +113,9 @@ namespace LobCorpWeaponExpansion
             object[] __args)
         {
             if (!RedEyeConfessionTwinComboHelper.IsTarget(__instance))
+            {
                 return true;
+            }
 
             if (__args == null ||
                 __args.Length == 0 ||
@@ -126,26 +128,17 @@ namespace LobCorpWeaponExpansion
                 __instance.Networkowner;
 
             int swing =
-                RedEyeConfessionTwinComboHelper.GetCurrentSwing(owner);
+                RedEyeConfessionTwinComboHelper.GetCurrentSwing(
+                    owner);
 
-            // 第一段：0 保留，1 跳过。
-            // 第二段：2 保留，3 跳过。
-            // 第三段：4、5 均保留。
+            // 第一段：保留 0，抑制 1。
+            // 第二段：保留 2，抑制 3。
+            // 第三段：保留 4、5。
             bool skip =
                 (swing == 0 && index == 1) ||
                 (swing == 1 && index == 3);
 
-            if (skip)
-            {
-                Debug.Log(
-                    "[脑叶武器扩展][双锤] " +
-                    $"已抑制额外攻击事件：Swing={swing}, Index={index}"
-                );
-
-                return false;
-            }
-
-            return true;
+            return !skip;
         }
     }
 }
