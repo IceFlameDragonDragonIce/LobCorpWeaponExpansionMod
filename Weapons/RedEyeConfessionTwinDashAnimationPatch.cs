@@ -11,7 +11,7 @@ namespace LobCorpWeaponExpansion
     internal static class RedEyeConfessionTwinDashAnimationPatch
     {
         private const string OriginalClipName =
-            "GreatSword_New_DashAttack";
+            "SwordAndShield_New_DashAttack";
 
         private const string TwinClipName =
             "Staff_DashAttack";
@@ -237,7 +237,7 @@ namespace LobCorpWeaponExpansion
             return hasBegin && hasFirstHit && hasEnd;
         }
 
-        private static void RestoreOverride(
+        internal static void RestoreOverride(
             WeaponControllerSimple controller)
         {
             if (controller == null ||
@@ -277,15 +277,6 @@ namespace LobCorpWeaponExpansion
         [HarmonyPatch(
             typeof(WeaponControllerSimple),
             "EndAttckAnimation")]
-        private static class RestoreOnEndPatch
-        {
-            [HarmonyPostfix]
-            private static void Postfix(
-                WeaponControllerSimple __instance)
-            {
-                RestoreOverride(__instance);
-            }
-        }
 
         [HarmonyPatch(
             typeof(WeaponControllerSimple),

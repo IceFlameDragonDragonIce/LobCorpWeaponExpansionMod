@@ -57,6 +57,10 @@ namespace LobCorpWeaponExpansion
             if (!RedEyeConfessionTwinComboHelper.IsTarget(current) ||
                 !(current is WeaponSimple_SwordAndShield))
             {
+                // 切换离开赤瞳＆忏悔时，恢复原始动画控制器。
+                RedEyeConfessionTwinDashAnimationPatch
+                    .RestoreOverride(controller);
+
                 ReleaseWeapon();
                 return;
             }
