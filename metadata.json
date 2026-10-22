@@ -1,0 +1,7 @@
+{
+  "modName": "脑叶武器扩展",
+  "modVersion": "0.1.0",
+  "modAuthor": "DragonIce·FrostFire",
+  "dllFile": "LobCorpWeaponExpansion.dll",
+  "entryClass": "LobCorpWeaponExpansion.LobCorpWeaponExpansionMod"
+}

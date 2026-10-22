@@ -1,0 +1,74 @@
+
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AssemblyName>LobCorpWeaponExpansion</AssemblyName>
+    <RootNamespace>LobCorpWeaponExpansion</RootNamespace>
+    <Version>0.1.0</Version>
+    <Deterministic>true</Deterministic>
+    <SephiriaGameDir Condition="'$(SephiriaGameDir)' == '' and '$(SEPHIRIA_GAME_DIR)' != ''">$(SEPHIRIA_GAME_DIR)</SephiriaGameDir>
+    <SephiriaGameDir Condition="'$(SephiriaGameDir)' == ''">D:\Steam\steamapps\common\Sephiria\</SephiriaGameDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="2.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(SephiriaGameDir)\Sephiria_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Mirror">
+      <HintPath>$(SephiriaGameDir)\Sephiria_Data\Managed\Mirror.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Mirror.Components">
+      <HintPath>$(SephiriaGameDir)\Sephiria_Data\Managed\Mirror.Components.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(SephiriaGameDir)\Sephiria_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(SephiriaGameDir)\Sephiria_Data\Managed\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(SephiriaGameDir)\Sephiria_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(SephiriaGameDir)\Sephiria_Data\Managed\UnityEngine.AnimationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(SephiriaGameDir)\Sephiria_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Textures\RedEyeConfession_MainHammer.png">
+      <LogicalName>LobCorpWeaponExpansion.Textures.RedEyeConfession_MainHammer.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Textures\RedEyeConfession_OffhandHammer.png">
+      <LogicalName>LobCorpWeaponExpansion.Textures.RedEyeConfession_OffhandHammer.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Textures\RedEyeConfession_Icon.png">
+      <LogicalName>LobCorpWeaponExpansion.Textures.RedEyeConfession_Icon.png</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <Target Name="ValidateSephiriaGameDir" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(SephiriaGameDir)\Sephiria_Data\Managed\Assembly-CSharp.dll')"
+           Text="Cannot find Assembly-CSharp.dll. Pass -p:SephiriaGameDir=&quot;FULL_PATH_TO_SEPHIRIA&quot; or set SEPHIRIA_GAME_DIR." />
+    <Error Condition="!Exists('$(SephiriaGameDir)\Sephiria_Data\Managed\Mirror.dll')"
+           Text="Cannot find Mirror.dll under the selected Sephiria installation." />
+  </Target>
+</Project>
+
