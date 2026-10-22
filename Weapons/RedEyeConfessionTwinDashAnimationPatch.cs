@@ -14,7 +14,7 @@ namespace LobCorpWeaponExpansion
             "GreatSword_New_DashAttack";
 
         private const string TwinClipName =
-            "Staff_DashAttack";
+            "Crossbow_DashAttack";
 
         private sealed class OverrideContext
         {
@@ -274,13 +274,34 @@ namespace LobCorpWeaponExpansion
             context.Override = null;
         }
 
-        [HarmonyPatch(
-            typeof(WeaponControllerSimple),
-            "EndAttckAnimation")]
+    }
+
+    /// <summary>
+    /// 动作取消时恢复原始 Animator Controller。
+    /// 不在 EndAttackAnimation 事件触发时立即恢复，
+    /// 避免目标动画尚未播放完就切回原始片段。
+    /// </summary>
     [HarmonyPatch(
-    typeof(WeaponControllerSimple),
-    nameof(WeaponControllerSimple.BeginDashAttackAnimation),
-    new[] { typeof(int) })]
+        typeof(WeaponControllerSimple),
+        nameof(WeaponControllerSimple.CancelAction))]
+    internal static class RedEyeConfessionDashCancelRestorePatch
+    {
+        [HarmonyPostfix]
+        private static void Postfix(
+            WeaponControllerSimple __instance)
+        {
+            RedEyeConfessionTwinDashAnimationPatch
+                .RestoreOverride(__instance);
+        }
+    }
+
+    /// <summary>
+    /// 记录赤瞳＆忏悔冲刺时 Animator 实际播放的动画片段。
+    /// </summary>
+    [HarmonyPatch(
+        typeof(WeaponControllerSimple),
+        nameof(WeaponControllerSimple.BeginDashAttackAnimation),
+        new[] { typeof(int) })]
     internal static class RedEyeConfessionDashRuntimeClipDiagnosticPatch
     {
         [HarmonyPostfix]
@@ -298,11 +319,11 @@ namespace LobCorpWeaponExpansion
             Animator animator = __instance.animator;
 
             if (animator == null)
-            {
                 return;
-            }
 
-            for (int layer = 0; layer < animator.layerCount; layer++)
+            for (int layer = 0;
+                 layer < animator.layerCount;
+                 layer++)
             {
                 AnimatorClipInfo[] clips =
                     animator.GetCurrentAnimatorClipInfo(layer);
@@ -310,9 +331,7 @@ namespace LobCorpWeaponExpansion
                 foreach (AnimatorClipInfo info in clips)
                 {
                     if (info.clip == null)
-                    {
                         continue;
-                    }
 
                     Debug.Log(
                         "[脑叶武器扩展][冲刺实际片段] " +
