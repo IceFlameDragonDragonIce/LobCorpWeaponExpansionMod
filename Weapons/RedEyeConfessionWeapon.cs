@@ -15,12 +15,11 @@ namespace LobCorpWeaponExpansion
         internal const string InternalName =
             "LobCorpWeaponExpansion_RedEyeConfession";
 
-        internal const string DisplayNameKey =
-            "Weapon_LobCorpWeaponExpansion_RedEyeConfession_Name";
+        internal static string DisplayNameKey =>
+            RedEyeConfessionData.GetTextKey("Name");
 
-        // 武器风味文本。本地化键采用 MekkReForge 的 _Flavor 命名方式。
-        internal const string FlavorTextKey =
-            "Weapon_LobCorpWeaponExpansion_RedEyeConfession_Flavor";
+        internal static string FlavorTextKey =>
+            RedEyeConfessionData.GetTextKey("Flavor");
 
         // 原版标准剑盾。
         private const int PrefabTemplateWeaponId = 0;
@@ -28,23 +27,33 @@ namespace LobCorpWeaponExpansion
         // 标准剑盾强化路线。
         private const int EnhancementParentWeaponId = 0;
 
-        private const int FirstCustomWeaponId = 14000;
-
         private static bool registered;
 
         internal static int RegisteredWeaponId { get; private set; } = -1;
 
         internal static void RegisterLocalization(
-            HorayModLocalizationContext context)
+    HorayModLocalizationContext context)
         {
             if (context == null)
                 return;
 
-            // 武器名称
+            // 优先读取 Weapons/372466/texts.json。
+            if (RedEyeConfessionData.RegisterTexts(context))
+                return;
+
+            // JSON 不可用时，保留原有翻译作为回退。
+            string chineseName = "赤瞳&忏悔";
+
+            if (RedEyeConfessionData.TryLoad(
+                    out RedEyeConfessionManifest manifest))
+            {
+                chineseName = manifest.displayName;
+            }
+
             context.AddText(
                 "zh-CN",
                 DisplayNameKey,
-                "赤瞳&忏悔");
+                chineseName);
 
             context.AddText(
                 "en-US",
@@ -56,7 +65,6 @@ namespace LobCorpWeaponExpansion
                 DisplayNameKey,
                 "赤瞳と懺悔");
 
-            // 武器风味文本
             context.AddText(
                 "zh-CN",
                 FlavorTextKey,
@@ -77,6 +85,14 @@ namespace LobCorpWeaponExpansion
         {
             if (registered)
                 return;
+
+            if (!RedEyeConfessionData.TryLoad(
+                    out RedEyeConfessionManifest manifest))
+            {
+                Debug.LogError(
+                    "[脑叶武器扩展] 无法读取武器配置，取消注册。");
+                return;
+            }
 
             List<WeaponEntity> weapons = WeaponDatabase.GetAll();
 
@@ -102,6 +118,16 @@ namespace LobCorpWeaponExpansion
 
             if (existingWeapon != null)
             {
+                if (existingWeapon.id != manifest.entityId)
+                {
+                    Debug.LogError(
+                        "[脑叶武器扩展] 已存在同名武器，但 ID 与 manifest.json 不一致。" +
+                        " 当前 ID=" + existingWeapon.id +
+                        "，配置 ID=" + manifest.entityId);
+
+                    return;
+                }
+
                 RegisteredWeaponId = existingWeapon.id;
 
                 Debug.LogWarning(
@@ -109,6 +135,22 @@ namespace LobCorpWeaponExpansion
                     "跳过重复注册。实际 ID=" + RegisteredWeaponId);
 
                 registered = true;
+                return;
+            }
+
+            // 检查预定 ID 是否被其他武器占用。
+            WeaponEntity idConflict = weapons.FirstOrDefault(
+                weapon =>
+                    weapon != null &&
+                    weapon.id == manifest.entityId);
+
+            if (idConflict != null)
+            {
+                Debug.LogError(
+                    "[脑叶武器扩展] 武器 ID 已被其他武器占用，取消注册。" +
+                    " ID=" + manifest.entityId +
+                    "，占用者=" + idConflict.name);
+
                 return;
             }
 
@@ -141,20 +183,7 @@ namespace LobCorpWeaponExpansion
                 return;
             }
 
-            int customId;
-
-            try
-            {
-                customId = FindUnusedWeaponId(weapons);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogError(
-                    "[脑叶武器扩展] 分配武器 ID 失败：" +
-                    exception);
-
-                return;
-            }
+            int customId = manifest.entityId;
 
             WeaponEntity customWeapon = null;
 
@@ -254,30 +283,6 @@ namespace LobCorpWeaponExpansion
                 "，MainPrefab=" +
                 customWeapon.mainWeaponPrefab.name +
                 "，使用原版网络预制体，不创建额外实例。");
-        }
-
-        private static int FindUnusedWeaponId(
-            List<WeaponEntity> weapons)
-        {
-            HashSet<int> usedIds = new HashSet<int>(
-                weapons
-                    .Where(weapon => weapon != null)
-                    .Select(weapon => weapon.id));
-
-            int candidate = FirstCustomWeaponId;
-
-            while (usedIds.Contains(candidate))
-            {
-                if (candidate == int.MaxValue)
-                {
-                    throw new InvalidOperationException(
-                        "找不到可用的自定义武器 ID。");
-                }
-
-                candidate++;
-            }
-
-            return candidate;
         }
     }
 }

@@ -9,15 +9,6 @@ namespace LobCorpWeaponExpansion
 {
     internal static class RedEyeConfessionSpriteAssets
     {
-        private const string MainResource =
-            "LobCorpWeaponExpansion.Textures.RedEyeConfession_MainHammer.png";
-
-        private const string OffhandResource =
-            "LobCorpWeaponExpansion.Textures.RedEyeConfession_OffhandHammer.png";
-
-        private const string IconResource =
-            "LobCorpWeaponExpansion.Textures.RedEyeConfession_Icon.png";
-
         private static Sprite mainHammerSprite;
         private static Sprite offhandHammerSprite;
         private static Sprite iconSprite;
@@ -59,12 +50,12 @@ namespace LobCorpWeaponExpansion
                         mainBody.weaponSpriteRenderer;
 
                     Sprite replacement = LoadSprite(
-                        MainResource,
-                        "主手锤子",
-                        renderer.sprite,
-                        ref mainHammerSprite,
-                        ref mainLoadAttempted
-                    );
+    "mainHammer",
+    "主手锤子",
+    renderer.sprite,
+    ref mainHammerSprite,
+    ref mainLoadAttempted
+);
 
                     if (replacement != null)
                     {
@@ -99,12 +90,12 @@ namespace LobCorpWeaponExpansion
                         offhand.weaponSpriteRenderer;
 
                     Sprite replacement = LoadSprite(
-                        OffhandResource,
-                        "副手锤子",
-                        renderer.sprite,
-                        ref offhandHammerSprite,
-                        ref offhandLoadAttempted
-                    );
+    "offhandHammer",
+    "副手锤子",
+    renderer.sprite,
+    ref offhandHammerSprite,
+    ref offhandLoadAttempted
+);
 
                     if (replacement != null)
                     {
@@ -211,12 +202,12 @@ namespace LobCorpWeaponExpansion
                 }
 
                 Sprite replacementIcon = LoadSprite(
-                    IconResource,
-                    "红眼忏悔物品图标",
-                    originalIcon,
-                    ref iconSprite,
-                    ref iconLoadAttempted
-                );
+    "icon",
+    "红眼忏悔物品图标",
+    originalIcon,
+    ref iconSprite,
+    ref iconLoadAttempted
+);
 
                 if (replacementIcon == null)
                     return;
@@ -290,11 +281,11 @@ namespace LobCorpWeaponExpansion
         }
 
         private static Sprite LoadSprite(
-            string resourceName,
-            string description,
-            Sprite originalSprite,
-            ref Sprite cachedSprite,
-            ref bool loadAttempted)
+    string artKey,
+    string description,
+    Sprite originalSprite,
+    ref Sprite cachedSprite,
+    ref bool loadAttempted)
         {
             if (cachedSprite != null)
                 return cachedSprite;
@@ -304,97 +295,91 @@ namespace LobCorpWeaponExpansion
 
             loadAttempted = true;
 
-            Assembly assembly =
-                typeof(LobCorpWeaponExpansionMod).Assembly;
-
-            using (Stream stream =
-                   assembly.GetManifestResourceStream(resourceName))
+            try
             {
-                if (stream == null)
+                if (!RedEyeConfessionData.TryGetArtPath(
+                        artKey,
+                        out string artPath))
                 {
                     Debug.LogError(
-                        $"[脑叶武器扩展][贴图] 找不到嵌入资源：{resourceName}\n" +
-                        "请检查 PNG 文件路径和 csproj 中的 EmbeddedResource 配置。\n" +
-                        "当前嵌入资源：" +
-                        string.Join(", ", assembly.GetManifestResourceNames())
-                    );
-
+                        "[脑叶武器扩展][贴图] 无法解析贴图路径：" +
+                        artKey);
                     return null;
                 }
 
-                using (var memory = new MemoryStream())
+                byte[] bytes = File.ReadAllBytes(artPath);
+
+                var texture = new Texture2D(
+                    2,
+                    2,
+                    TextureFormat.RGBA32,
+                    false);
+
+                if (!texture.LoadImage(bytes))
                 {
-                    stream.CopyTo(memory);
-                    byte[] bytes = memory.ToArray();
+                    UnityEngine.Object.Destroy(texture);
 
-                    var texture = new Texture2D(
-                        2,
-                        2,
-                        TextureFormat.RGBA32,
-                        false
-                    );
-
-                    if (!texture.LoadImage(bytes))
-                    {
-                        UnityEngine.Object.Destroy(texture);
-
-                        Debug.LogError(
-                            $"[脑叶武器扩展][贴图] PNG 解码失败：{description}"
-                        );
-
-                        return null;
-                    }
-
-                    texture.name = description;
-                    texture.wrapMode = TextureWrapMode.Clamp;
-
-                    texture.filterMode =
-                        originalSprite != null &&
-                        originalSprite.texture != null
-                            ? originalSprite.texture.filterMode
-                            : FilterMode.Point;
-
-                    float pixelsPerUnit =
-                        originalSprite != null
-                            ? originalSprite.pixelsPerUnit
-                            : 100f;
-
-                    Vector2 pivot = new Vector2(0.5f, 0.5f);
-
-                    if (originalSprite != null &&
-                        originalSprite.rect.width > 0f &&
-                        originalSprite.rect.height > 0f)
-                    {
-                        pivot = new Vector2(
-                            originalSprite.pivot.x /
-                                originalSprite.rect.width,
-                            originalSprite.pivot.y /
-                                originalSprite.rect.height
-                        );
-                    }
-
-                    cachedSprite = Sprite.Create(
-                        texture,
-                        new Rect(
-                            0f,
-                            0f,
-                            texture.width,
-                            texture.height
-                        ),
-                        pivot,
-                        pixelsPerUnit
-                    );
-
-                    cachedSprite.name = description;
-
-                    Debug.Log(
-                        $"[脑叶武器扩展][贴图] 已加载 {description}：" +
-                        $"{texture.width}x{texture.height}，" +
-                        $"PPU={pixelsPerUnit}"
-                    );
-
-                    return cachedSprite;
+                    Debug.LogError(
+                        "[脑叶武器扩展][贴图] PNG 解码失败：" +
+                        description);
+                    return null;
                 }
+
+                texture.name = description;
+                texture.wrapMode = TextureWrapMode.Clamp;
+
+                texture.filterMode =
+                    originalSprite != null &&
+                    originalSprite.texture != null
+                        ? originalSprite.texture.filterMode
+                        : FilterMode.Point;
+
+                float pixelsPerUnit =
+                    originalSprite != null
+                        ? originalSprite.pixelsPerUnit
+                        : 100f;
+
+                Vector2 pivot = new Vector2(0.5f, 0.5f);
+
+                if (originalSprite != null &&
+                    originalSprite.rect.width > 0f &&
+                    originalSprite.rect.height > 0f)
+                {
+                    pivot = new Vector2(
+                        originalSprite.pivot.x /
+                            originalSprite.rect.width,
+                        originalSprite.pivot.y /
+                            originalSprite.rect.height);
+                }
+
+                cachedSprite = Sprite.Create(
+                    texture,
+                    new Rect(
+                        0f,
+                        0f,
+                        texture.width,
+                        texture.height),
+                    pivot,
+                    pixelsPerUnit);
+
+                cachedSprite.name = description;
+
+                Debug.Log(
+                    "[脑叶武器扩展][贴图] 已从配置目录加载 " +
+                    description + "：" +
+                    artPath + "，" +
+                    texture.width + "x" +
+                    texture.height);
+
+                return cachedSprite;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[脑叶武器扩展][贴图] 加载 " +
+                    description + " 失败：" +
+                    exception);
+                return null;
             }
         }
 

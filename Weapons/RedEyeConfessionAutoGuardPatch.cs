@@ -14,8 +14,6 @@ namespace LobCorpWeaponExpansion
     /// </summary>
     internal static class RedEyeConfessionAutoGuard
     {
-        private const int WeaponId = 14000;
-
         // 与原版 StartGuard 使用相同的角度。
         private const float GuardAngle = 190f;
 
@@ -51,11 +49,14 @@ namespace LobCorpWeaponExpansion
         /// </summary>
         public static void Begin(WeaponSimple_SwordAndShield weapon)
         {
+            int registeredWeaponId =
+                RedEyeConfessionWeapon.RegisteredWeaponId;
             try
             {
                 if (weapon == null
                     || !weapon.isServer
-                    || weapon.entityId != WeaponId)
+                    || registeredWeaponId < 0
+                    || weapon.entityId != registeredWeaponId)
                 {
                     return;
                 }

@@ -75,20 +75,6 @@
     </Reference>
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="Textures\RedEyeConfession_MainHammer.png">
-      <LogicalName>LobCorpWeaponExpansion.Textures.RedEyeConfession_MainHammer.png</LogicalName>
-    </EmbeddedResource>
-
-    <EmbeddedResource Include="Textures\RedEyeConfession_OffhandHammer.png">
-      <LogicalName>LobCorpWeaponExpansion.Textures.RedEyeConfession_OffhandHammer.png</LogicalName>
-    </EmbeddedResource>
-
-    <EmbeddedResource Include="Textures\RedEyeConfession_Icon.png">
-      <LogicalName>LobCorpWeaponExpansion.Textures.RedEyeConfession_Icon.png</LogicalName>
-    </EmbeddedResource>
-  </ItemGroup>
-
   <Target Name="ValidateSephiriaGameDir" BeforeTargets="ResolveReferences">
     <Error
       Condition="!Exists('$(SephiriaGameDir)\Sephiria_Data\Managed\Assembly-CSharp.dll')"
