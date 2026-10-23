@@ -22,6 +22,9 @@ namespace LobCorpWeaponExpansion
             {
                 base.OnModLoaded();
 
+                // 安装赤瞳&忏悔的独立风味文本补丁。
+                RedEyeConfessionFlavorTextPatch.Apply();
+
                 if (!hooksRegistered)
                 {
                     HorayModAPI.OnLocalizationReady +=
@@ -63,6 +66,18 @@ namespace LobCorpWeaponExpansion
                         OnLoadWeaponDatabase;
 
                     hooksRegistered = false;
+                }
+
+                // 撤销独立安装的风味文本补丁。
+                try
+                {
+                    RedEyeConfessionFlavorTextPatch.Unapply();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError(
+                        "[脑叶武器扩展] 清理风味文本补丁失败：" +
+                        exception);
                 }
 
                 if (harmony != null)
@@ -110,7 +125,7 @@ namespace LobCorpWeaponExpansion
                     exception);
             }
 
-            // 图标替换与武器注册分开处理，避免互相影响。
+            // 图标替换与武器注册分开处理。
             try
             {
                 RedEyeConfessionSpriteAssets.ApplyWeaponIcon();

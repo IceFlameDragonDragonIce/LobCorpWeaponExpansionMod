@@ -18,6 +18,10 @@ namespace LobCorpWeaponExpansion
         internal const string DisplayNameKey =
             "Weapon_LobCorpWeaponExpansion_RedEyeConfession_Name";
 
+        // 武器风味文本。本地化键采用 MekkReForge 的 _Flavor 命名方式。
+        internal const string FlavorTextKey =
+            "Weapon_LobCorpWeaponExpansion_RedEyeConfession_Flavor";
+
         // 原版标准剑盾。
         private const int PrefabTemplateWeaponId = 0;
 
@@ -27,13 +31,16 @@ namespace LobCorpWeaponExpansion
         private const int FirstCustomWeaponId = 14000;
 
         private static bool registered;
+
         internal static int RegisteredWeaponId { get; private set; } = -1;
+
         internal static void RegisterLocalization(
             HorayModLocalizationContext context)
         {
             if (context == null)
                 return;
 
+            // 武器名称
             context.AddText(
                 "zh-CN",
                 DisplayNameKey,
@@ -48,6 +55,22 @@ namespace LobCorpWeaponExpansion
                 "ja-JP",
                 DisplayNameKey,
                 "赤瞳と懺悔");
+
+            // 武器风味文本
+            context.AddText(
+                "zh-CN",
+                FlavorTextKey,
+                "赤瞳凝视罪人，忏悔则为其降下最后的判决。");
+
+            context.AddText(
+                "en-US",
+                FlavorTextKey,
+                "The crimson eye watches the condemned; penance delivers the final verdict.");
+
+            context.AddText(
+                "ja-JP",
+                FlavorTextKey,
+                "赤き瞳は罪人を見据え、懺悔が最後の審判を下す。");
         }
 
         internal static void Register()
@@ -150,7 +173,6 @@ namespace LobCorpWeaponExpansion
                 customWeapon.aName =
                     new LocalizedString(DisplayNameKey);
 
-                // 关键修改：
                 // 直接引用原版预制体资产，不 Instantiate 游戏物体。
                 customWeapon.mainWeaponPrefab =
                     template.mainWeaponPrefab;
