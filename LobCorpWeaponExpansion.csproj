@@ -38,6 +38,12 @@
       <Private>false</Private>
     </Reference>
 
+    <Reference Include="UnityEngine.JSONSerializeModule">
+      <HintPath>$(SephiriaGameDir)\Sephiria_Data\Managed\UnityEngine.JSONSerializeModule.dll</HintPath>
+      <Private>false</Private>
+      </Reference>
+
+
     <Reference Include="UnityEngine.UIModule">
       <HintPath>$(SephiriaGameDir)\Sephiria_Data\Managed\UnityEngine.UIModule.dll</HintPath>
       <Private>false</Private>

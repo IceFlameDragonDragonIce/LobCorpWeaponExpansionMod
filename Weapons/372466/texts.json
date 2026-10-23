@@ -1,0 +1,18 @@
+{
+  "entries": [
+    {
+      "key": "Name",
+      "zhCN": "赤瞳&忏悔",
+      "zhTW": "赤瞳&懺悔",
+      "enUS": "Red Eye & Confession",
+      "jaJP": "赤瞳と懺悔"
+    },
+    {
+      "key": "Flavor",
+      "zhCN": "赤瞳凝视罪人，忏悔则为其降下最后的判决。",
+      "zhTW": "赤瞳凝視罪人，懺悔則為其降下最後的判決。",
+      "enUS": "The crimson eye watches the condemned; penance delivers the final verdict.",
+      "jaJP": "赤き瞳は罪人を見据え、懺悔が最後の審判を下す。"
+    }
+  ]
+}

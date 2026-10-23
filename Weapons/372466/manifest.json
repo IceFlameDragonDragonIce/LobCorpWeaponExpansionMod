@@ -1,0 +1,11 @@
+{
+  "entityId": 372466,
+  "displayName": "赤瞳&忏悔",
+  "textPrefix": "WP372466",
+
+  "art": {
+    "icon": "icon.png",
+    "mainHammer": "main_hammer.png",
+    "offhandHammer": "offhand_hammer.png"
+  }
+}
