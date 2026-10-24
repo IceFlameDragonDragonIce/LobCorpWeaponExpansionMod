@@ -21,6 +21,9 @@ namespace LobCorpWeaponExpansion
         internal static string FlavorTextKey =>
             RedEyeConfessionData.GetTextKey("Flavor");
 
+        internal static string Tier1TextKey =>
+            RedEyeConfessionData.GetTextKey("Tier1");
+
         // 原版标准剑盾。
         private const int PrefabTemplateWeaponId = 0;
 

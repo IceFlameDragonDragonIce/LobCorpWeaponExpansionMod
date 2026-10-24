@@ -7,8 +7,8 @@ using UnityEngine.UI;
 namespace LobCorpWeaponExpansion
 {
     /// <summary>
-    /// 为赤瞳&忏悔的武器提示框增加独立风味文本行。
-    /// 不修改原版文件，也不覆盖原有强化说明。
+    /// 在武器详情的 ActionTab 中显示自定义描述。
+    /// 优先显示 Tier1，再显示 Flavor。
     /// </summary>
     internal static class RedEyeConfessionFlavorTextPatch
     {
@@ -19,12 +19,14 @@ namespace LobCorpWeaponExpansion
 
         private sealed class TooltipState
         {
-            public UI_SimpleTextBox FlavorBox;
-            public UI_SimpleTextBox[] OriginalBoxes;
+            public UI_SimpleTextBox DescriptionBox;
             public RectTransform TooltipRect;
+            public RectTransform ContentPanelRect;
+            public RectTransform ActionTabRect;
+
             public Vector2 OriginalTooltipSize;
-            public RectTransform RowParent;
-            public Vector2 OriginalParentSize;
+            public Vector2 OriginalContentPanelSize;
+            public Vector2 OriginalActionTabSize;
         }
 
         private static readonly Dictionary<
@@ -52,7 +54,7 @@ namespace LobCorpWeaponExpansion
             {
                 Debug.LogError(
                     "[脑叶武器扩展] 找不到 UI_WeaponTooltip.Open，" +
-                    "风味文本补丁未启用。");
+                    "描述补丁未启用。");
                 return;
             }
 
@@ -68,7 +70,7 @@ namespace LobCorpWeaponExpansion
                     nameof(Postfix)));
 
             Debug.Log(
-                "[脑叶武器扩展] 赤瞳&忏悔风味文本补丁已启用。");
+                "[脑叶武器扩展] 赤瞳&忏悔描述文本补丁已启用。");
         }
 
         internal static void Unapply()
@@ -84,32 +86,39 @@ namespace LobCorpWeaponExpansion
                 if (state == null)
                     continue;
 
-                // 恢复原来的 UI 尺寸。
-                if (state.TooltipRect != null)
-                {
-                    state.TooltipRect.sizeDelta =
-                        state.OriginalTooltipSize;
-                }
+                RestoreSizes(state);
 
-                if (state.RowParent != null)
-                {
-                    state.RowParent.sizeDelta =
-                        state.OriginalParentSize;
-                }
-
-                if (state.FlavorBox != null)
+                if (state.DescriptionBox != null)
                 {
                     UnityEngine.Object.Destroy(
-                        state.FlavorBox.gameObject);
+                        state.DescriptionBox.gameObject);
                 }
             }
 
             States.Clear();
         }
 
-        /// <summary>
-        /// 在原版 Open 之前恢复尺寸并隐藏上一轮风味文本。
-        /// </summary>
+        private static void RestoreSizes(TooltipState state)
+        {
+            if (state.TooltipRect != null)
+            {
+                state.TooltipRect.sizeDelta =
+                    state.OriginalTooltipSize;
+            }
+
+            if (state.ContentPanelRect != null)
+            {
+                state.ContentPanelRect.sizeDelta =
+                    state.OriginalContentPanelSize;
+            }
+
+            if (state.ActionTabRect != null)
+            {
+                state.ActionTabRect.sizeDelta =
+                    state.OriginalActionTabSize;
+            }
+        }
+
         private static void Prefix(UI_WeaponTooltip __instance)
         {
             if (__instance == null)
@@ -120,19 +129,12 @@ namespace LobCorpWeaponExpansion
             if (state == null)
                 return;
 
-            state.TooltipRect.sizeDelta =
-                state.OriginalTooltipSize;
+            RestoreSizes(state);
 
-            state.RowParent.sizeDelta =
-                state.OriginalParentSize;
-
-            state.FlavorBox.SetText("");
-            state.FlavorBox.gameObject.SetActive(false);
+            state.DescriptionBox.SetText("");
+            state.DescriptionBox.gameObject.SetActive(false);
         }
 
-        /// <summary>
-        /// 原版 Open 完成后，为目标武器显示风味文本。
-        /// </summary>
         private static void Postfix(
             UI_WeaponTooltip __instance,
             ITooltip data)
@@ -144,8 +146,7 @@ namespace LobCorpWeaponExpansion
 
             if (weapon == null ||
                 RedEyeConfessionWeapon.RegisteredWeaponId < 0 ||
-                weapon.id !=
-                    RedEyeConfessionWeapon.RegisteredWeaponId)
+                weapon.id != RedEyeConfessionWeapon.RegisteredWeaponId)
             {
                 return;
             }
@@ -155,77 +156,208 @@ namespace LobCorpWeaponExpansion
             if (state == null)
                 return;
 
-            string flavor = new LocalizedString(
-                RedEyeConfessionWeapon.FlavorTextKey
-            ).ToString();
+            string tier1Key =
+                RedEyeConfessionWeapon.Tier1TextKey;
 
-            if (string.IsNullOrWhiteSpace(flavor) ||
-                flavor ==
-                    RedEyeConfessionWeapon.FlavorTextKey)
+            string flavorKey =
+                RedEyeConfessionWeapon.FlavorTextKey;
+
+            string tier1 =
+                new LocalizedString(tier1Key).ToString();
+
+            string flavor =
+                new LocalizedString(flavorKey).ToString();
+
+            bool hasTier1 =
+                !string.IsNullOrWhiteSpace(tier1) &&
+                tier1 != tier1Key;
+
+            bool hasFlavor =
+                !string.IsNullOrWhiteSpace(flavor) &&
+                flavor != flavorKey;
+
+            if (!hasTier1 && !hasFlavor)
             {
                 Debug.LogWarning(
-                    "[脑叶武器扩展] 风味文本键尚未得到有效的本地化文本：" +
-                    RedEyeConfessionWeapon.FlavorTextKey);
+                    "[脑叶武器扩展][描述] 没有有效的自定义文本。" +
+                    " Tier1Key=" + tier1Key +
+                    "，FlavorKey=" + flavorKey);
                 return;
             }
 
-            UI_SimpleTextBox box = state.FlavorBox;
+            string displayText;
 
-            box.SetText(flavor);
-            box.gameObject.SetActive(true);
-
-            // 没有强化说明时，隐藏原版的空状态提示。
-            if (__instance.emptyUpgradeObject != null)
+            if (hasTier1 && hasFlavor)
             {
-                __instance.emptyUpgradeObject.SetActive(false);
+                displayText = tier1 + "\n\n" + flavor;
+            }
+            else
+            {
+                displayText = hasTier1 ? tier1 : flavor;
             }
 
-            Canvas.ForceUpdateCanvases();
-
+            UI_SimpleTextBox box = state.DescriptionBox;
             RectTransform boxRect =
                 box.GetComponent<RectTransform>();
 
-            float width = box.text.rectTransform.rect.width;
+            // 先确定正确的宽度，避免 TMP 文本区域只有几个像素。
+            float width = Mathf.Max(
+                1f,
+                state.ActionTabRect.rect.width - 16f);
 
-            if (width <= 1f)
-                width = boxRect.rect.width;
+            boxRect.anchorMin = new Vector2(0f, 1f);
+            boxRect.anchorMax = new Vector2(1f, 1f);
+            boxRect.pivot = new Vector2(0.5f, 1f);
+            boxRect.sizeDelta = new Vector2(-16f, 30f);
+            boxRect.anchoredPosition = Vector2.zero;
 
-            float preferredHeight = box.text.GetPreferredValues(
-                flavor,
-                width,
-                0f
-            ).y;
+            box.gameObject.SetActive(true);
+            box.SetText(displayText);
+
+            Canvas.ForceUpdateCanvases();
+
+            float preferredHeight =
+                box.text.GetPreferredValues(
+                    displayText,
+                    width,
+                    0f).y;
 
             float rowHeight = Mathf.Max(
-                boxRect.rect.height,
-                preferredHeight + 10f
-            );
+                30f,
+                preferredHeight + 12f);
 
             boxRect.SetSizeWithCurrentAnchors(
                 RectTransform.Axis.Vertical,
-                rowHeight
-            );
+                rowHeight);
 
-            PositionFlavorRow(state);
+            // 为文字增加额外空间，随后重新计算位置。
+            float extraHeight = rowHeight + 12f;
 
-            // 为新增文本行留出空间。
-            float extraHeight = rowHeight + 8f;
-
-            state.RowParent.sizeDelta =
+            state.ActionTabRect.sizeDelta =
                 new Vector2(
-                    state.OriginalParentSize.x,
-                    state.OriginalParentSize.y + extraHeight
-                );
+                    state.OriginalActionTabSize.x,
+                    state.OriginalActionTabSize.y + extraHeight);
+
+            state.ContentPanelRect.sizeDelta =
+                new Vector2(
+                    state.OriginalContentPanelSize.x,
+                    state.OriginalContentPanelSize.y + extraHeight);
 
             state.TooltipRect.sizeDelta =
                 new Vector2(
                     state.OriginalTooltipSize.x,
-                    state.OriginalTooltipSize.y + extraHeight
-                );
+                    state.OriginalTooltipSize.y + extraHeight);
+
+            Canvas.ForceUpdateCanvases();
+
+            PositionDescriptionRow(state, rowHeight);
 
             LayoutRebuilder.ForceRebuildLayoutImmediate(
-                state.RowParent
-            );
+                state.ActionTabRect);
+
+            LayoutRebuilder.ForceRebuildLayoutImmediate(
+                state.ContentPanelRect);
+
+            Canvas.ForceUpdateCanvases();
+
+            Debug.Log(
+                "[脑叶武器扩展][描述] 自定义描述已处理。" +
+                " Tier1=" + hasTier1 +
+                "，Flavor=" + hasFlavor +
+                "，文本宽度=" + width +
+                "，文本高度=" + rowHeight +
+                "，ActionTabActive=" +
+                state.ActionTabRect.gameObject.activeInHierarchy);
+        }
+
+        private static void PositionDescriptionRow(
+            TooltipState state,
+            float rowHeight)
+        {
+            RectTransform parent = state.ActionTabRect;
+            RectTransform rowRect =
+                state.DescriptionBox.GetComponent<RectTransform>();
+
+            // 存在布局组件时，让 Unity 负责纵向排列。
+            LayoutGroup layoutGroup =
+                parent.GetComponent<LayoutGroup>();
+
+            if (layoutGroup != null)
+            {
+                LayoutElement layoutElement =
+                    state.DescriptionBox.GetComponent<LayoutElement>();
+
+                if (layoutElement == null)
+                {
+                    layoutElement =
+                        state.DescriptionBox.gameObject
+                            .AddComponent<LayoutElement>();
+                }
+
+                layoutElement.minHeight = rowHeight;
+                layoutElement.preferredHeight = rowHeight;
+                layoutElement.flexibleHeight = 0f;
+
+                rowRect.SetAsLastSibling();
+
+                LayoutRebuilder.ForceRebuildLayoutImmediate(parent);
+                return;
+            }
+
+            // 没有布局组件时，找出普通攻击、冲刺、防御等
+            // SubWeapon 行的最下沿。
+            float lowestBottom = float.PositiveInfinity;
+            bool foundRow = false;
+
+            Vector3[] corners = new Vector3[4];
+
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                Transform child = parent.GetChild(i);
+
+                if (child == state.DescriptionBox.transform ||
+                    !child.name.StartsWith(
+                        "SubWeapon",
+                        StringComparison.Ordinal) ||
+                    !child.gameObject.activeSelf)
+                {
+                    continue;
+                }
+
+                RectTransform rect = child as RectTransform;
+
+                if (rect == null)
+                    continue;
+
+                rect.GetWorldCorners(corners);
+
+                for (int j = 0; j < corners.Length; j++)
+                {
+                    float localY =
+                        parent.InverseTransformPoint(corners[j]).y;
+
+                    lowestBottom = Mathf.Min(
+                        lowestBottom,
+                        localY);
+                }
+
+                foundRow = true;
+            }
+
+            if (!foundRow)
+            {
+                Debug.LogWarning(
+                    "[脑叶武器扩展][描述] 没有找到可定位的 SubWeapon 行。");
+                rowRect.anchoredPosition = new Vector2(0f, -8f);
+                return;
+            }
+
+            // 描述框采用顶部锚点，因此其顶部放在最后一行动作下方。
+            float targetTopY = lowestBottom - 8f;
+
+            rowRect.anchoredPosition = new Vector2(
+                0f,
+                targetTopY - parent.rect.yMax);
         }
 
         private static WeaponEntity ResolveWeapon(ITooltip data)
@@ -236,8 +368,7 @@ namespace LobCorpWeaponExpansion
             if (data is WeaponSimple simple)
             {
                 return WeaponDatabase.FindWeaponById(
-                    simple.entityId
-                );
+                    simple.entityId);
             }
 
             if (data is WeaponPreview preview)
@@ -249,10 +380,25 @@ namespace LobCorpWeaponExpansion
         private static TooltipState GetOrCreateState(
             UI_WeaponTooltip instance)
         {
-            if (States.TryGetValue(instance, out TooltipState existing))
+            if (States.TryGetValue(
+                    instance,
+                    out TooltipState existing))
             {
-                if (existing.FlavorBox != null)
+                if (existing.DescriptionBox != null)
                     return existing;
+            }
+
+            Transform contentPanel =
+                instance.transform.Find("ContentPanel");
+
+            Transform actionTab =
+                instance.transform.Find("ContentPanel/ActionTab");
+
+            if (contentPanel == null || actionTab == null)
+            {
+                Debug.LogWarning(
+                    "[脑叶武器扩展][描述] 找不到 ContentPanel/ActionTab。");
+                return null;
             }
 
             UI_SimpleTextBox[] boxes =
@@ -261,8 +407,8 @@ namespace LobCorpWeaponExpansion
             if (boxes == null || boxes.Length == 0)
             {
                 Debug.LogWarning(
-                    "[脑叶武器扩展] upgradeTextBoxes 为空，" +
-                    "无法创建风味文本行。");
+                    "[脑叶武器扩展][描述] upgradeTextBoxes 为空，" +
+                    "无法创建描述框。");
                 return null;
             }
 
@@ -280,128 +426,61 @@ namespace LobCorpWeaponExpansion
             if (template == null)
             {
                 Debug.LogWarning(
-                    "[脑叶武器扩展] 找不到可复制的 UI_SimpleTextBox。");
+                    "[脑叶武器扩展][描述] 找不到可用的 UI_SimpleTextBox。");
                 return null;
             }
-
-            RectTransform rowParent =
-                template.transform.parent as RectTransform;
 
             RectTransform tooltipRect =
                 instance.GetComponent<RectTransform>();
 
-            if (rowParent == null || tooltipRect == null)
+            RectTransform contentPanelRect =
+                contentPanel as RectTransform;
+
+            RectTransform actionTabRect =
+                actionTab as RectTransform;
+
+            if (tooltipRect == null ||
+                contentPanelRect == null ||
+                actionTabRect == null)
+            {
                 return null;
+            }
 
             GameObject clone = UnityEngine.Object.Instantiate(
                 template.gameObject,
-                rowParent,
-                false
-            );
+                actionTab,
+                false);
 
             clone.name =
-                "LobCorpWeaponExpansion_FlavorText";
+                "LobCorpWeaponExpansion_Description";
 
-            UI_SimpleTextBox flavorBox =
+            UI_SimpleTextBox descriptionBox =
                 clone.GetComponent<UI_SimpleTextBox>();
 
-            if (flavorBox == null)
+            if (descriptionBox == null)
             {
                 UnityEngine.Object.Destroy(clone);
                 return null;
             }
 
             clone.SetActive(false);
-            clone.transform.SetAsLastSibling();
 
             TooltipState state = new TooltipState
             {
-                FlavorBox = flavorBox,
-                OriginalBoxes = boxes,
+                DescriptionBox = descriptionBox,
                 TooltipRect = tooltipRect,
+                ContentPanelRect = contentPanelRect,
+                ActionTabRect = actionTabRect,
+
                 OriginalTooltipSize = tooltipRect.sizeDelta,
-                RowParent = rowParent,
-                OriginalParentSize = rowParent.sizeDelta
+                OriginalContentPanelSize =
+                    contentPanelRect.sizeDelta,
+                OriginalActionTabSize =
+                    actionTabRect.sizeDelta
             };
 
             States[instance] = state;
-
             return state;
-        }
-
-        private static void PositionFlavorRow(TooltipState state)
-        {
-            RectTransform rowRect =
-                state.FlavorBox.GetComponent<RectTransform>();
-
-            RectTransform parent = state.RowParent;
-
-            // 有布局组件时交给 Unity 的布局系统排列。
-            if (parent.GetComponent<LayoutGroup>() != null)
-            {
-                state.FlavorBox.transform.SetAsLastSibling();
-
-                LayoutRebuilder.ForceRebuildLayoutImmediate(parent);
-                return;
-            }
-
-            bool foundActiveRow = false;
-            float lowestBottom = float.PositiveInfinity;
-
-            Vector3[] corners = new Vector3[4];
-
-            foreach (UI_SimpleTextBox box in state.OriginalBoxes)
-            {
-                if (box == null || !box.gameObject.activeSelf)
-                    continue;
-
-                RectTransform rect =
-                    box.GetComponent<RectTransform>();
-
-                rect.GetWorldCorners(corners);
-
-                for (int i = 0; i < corners.Length; i++)
-                {
-                    float localY = parent
-                        .InverseTransformPoint(corners[i]).y;
-
-                    lowestBottom = Mathf.Min(
-                        lowestBottom,
-                        localY
-                    );
-                }
-
-                foundActiveRow = true;
-            }
-
-            if (!foundActiveRow)
-            {
-                // 原武器没有强化说明时，将风味文本放在第一行位置。
-                foreach (UI_SimpleTextBox box in state.OriginalBoxes)
-                {
-                    if (box == null)
-                        continue;
-
-                    rowRect.position =
-                        box.GetComponent<RectTransform>().position;
-
-                    return;
-                }
-
-                return;
-            }
-
-            Vector3 localPosition =
-                parent.InverseTransformPoint(rowRect.position);
-
-            float height = rowRect.rect.height;
-
-            // 将新文本行放到所有当前显示的强化说明下方。
-            localPosition.y =
-                lowestBottom - 8f - height * (1f - rowRect.pivot.y);
-
-            rowRect.position =
-                parent.TransformPoint(localPosition);
         }
     }
 }
