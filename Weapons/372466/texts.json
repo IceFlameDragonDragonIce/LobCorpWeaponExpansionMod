@@ -9,10 +9,10 @@
     },
     {
       "key": "Tier1",
-      "zhCN": "<tag=AttackSpeed> 增加<color=#61D99F>15%</color>\n进行<tag=WeaponAction_BasicAttack>时自动触发<tag=WeaponAction_Guard>\n普通攻击第三段与冲刺攻击各进行两次打击",
-      "zhTW": "<tag=AttackSpeed> 增加<color=#61D99F>15%</color>\n進行<tag=WeaponAction_BasicAttack>時自動觸發<tag=WeaponAction_Guard>\n普通攻擊第三段與衝刺攻擊各進行兩次打擊",
-      "enUS": "<tag=AttackSpeed> +<color=#61D99F>15%</color>\nAutomatically <tag=WeaponAction_Guard> during a <tag=WeaponAction_BasicAttack>\nThe third basic-attack combo and dash attack each strike twice",
-      "jaJP": "<tag=AttackSpeed> が<color=#61D99F>15%</color>増加\n<tag=WeaponAction_BasicAttack>中に自動で<tag=WeaponAction_Guard>\n通常攻撃の第3段とダッシュ攻撃はそれぞれ2回攻撃する"
+      "zhCN": "攻击速度增加 15%\n普通攻击时自动触发防御\n普通攻击第三段与冲刺攻击各进行两次打击",
+      "zhTW": "攻擊速度增加 15%\n普通攻擊時自動觸發防禦\n普通攻擊第三段與衝刺攻擊各進行兩次打擊",
+      "enUS": "Attack Speed +15%\nAutomatically guards during a basic attack\nThe third basic-attack combo and dash attack each strike twice",
+      "jaJP": "攻撃速度が 15% 増加\n通常攻撃中に自動でガードする\n通常攻撃の第3段とダッシュ攻撃はそれぞれ2回攻撃する"
     },
     {
       "key": "Flavor",

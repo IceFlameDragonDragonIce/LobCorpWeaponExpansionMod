@@ -7,8 +7,9 @@ using UnityEngine.UI;
 namespace LobCorpWeaponExpansion
 {
     /// <summary>
-    /// 在武器详情的 ActionTab 中显示自定义描述。
+    /// 在武器详情的 UpgradesTab 中显示自定义描述。
     /// 优先显示 Tier1，再显示 Flavor。
+    /// 不向 ActionTab 添加自定义描述。
     /// </summary>
     internal static class RedEyeConfessionFlavorTextPatch
     {
@@ -20,13 +21,15 @@ namespace LobCorpWeaponExpansion
         private sealed class TooltipState
         {
             public UI_SimpleTextBox DescriptionBox;
+            public UI_SimpleTextBox[] OriginalBoxes;
+
             public RectTransform TooltipRect;
             public RectTransform ContentPanelRect;
-            public RectTransform ActionTabRect;
+            public RectTransform UpgradesTabRect;
 
             public Vector2 OriginalTooltipSize;
             public Vector2 OriginalContentPanelSize;
-            public Vector2 OriginalActionTabSize;
+            public Vector2 OriginalUpgradesTabSize;
         }
 
         private static readonly Dictionary<
@@ -70,7 +73,7 @@ namespace LobCorpWeaponExpansion
                     nameof(Postfix)));
 
             Debug.Log(
-                "[脑叶武器扩展] 赤瞳&忏悔描述文本补丁已启用。");
+                "[脑叶武器扩展] 赤瞳&忏悔强化描述补丁已启用。");
         }
 
         internal static void Unapply()
@@ -112,13 +115,16 @@ namespace LobCorpWeaponExpansion
                     state.OriginalContentPanelSize;
             }
 
-            if (state.ActionTabRect != null)
+            if (state.UpgradesTabRect != null)
             {
-                state.ActionTabRect.sizeDelta =
-                    state.OriginalActionTabSize;
+                state.UpgradesTabRect.sizeDelta =
+                    state.OriginalUpgradesTabSize;
             }
         }
 
+        /// <summary>
+        /// 原版打开提示框前，恢复尺寸并隐藏上一轮描述。
+        /// </summary>
         private static void Prefix(UI_WeaponTooltip __instance)
         {
             if (__instance == null)
@@ -135,6 +141,9 @@ namespace LobCorpWeaponExpansion
             state.DescriptionBox.gameObject.SetActive(false);
         }
 
+        /// <summary>
+        /// 只在目标武器的强化页签中准备自定义描述。
+        /// </summary>
         private static void Postfix(
             UI_WeaponTooltip __instance,
             ITooltip data)
@@ -155,6 +164,9 @@ namespace LobCorpWeaponExpansion
 
             if (state == null)
                 return;
+
+            // 将《强化》页签加入可切换列表。
+            EnsureUpgradesTabSelectable(__instance, state);
 
             string tier1Key =
                 RedEyeConfessionWeapon.Tier1TextKey;
@@ -197,22 +209,29 @@ namespace LobCorpWeaponExpansion
             }
 
             UI_SimpleTextBox box = state.DescriptionBox;
+
             RectTransform boxRect =
                 box.GetComponent<RectTransform>();
 
-            // 先确定正确的宽度，避免 TMP 文本区域只有几个像素。
             float width = Mathf.Max(
                 1f,
-                state.ActionTabRect.rect.width - 16f);
+                state.UpgradesTabRect.rect.width - 16f);
 
+            // 描述框属于 UpgradesTab，不属于 ActionTab。
             boxRect.anchorMin = new Vector2(0f, 1f);
             boxRect.anchorMax = new Vector2(1f, 1f);
             boxRect.pivot = new Vector2(0.5f, 1f);
             boxRect.sizeDelta = new Vector2(-16f, 30f);
             boxRect.anchoredPosition = Vector2.zero;
 
-            box.gameObject.SetActive(true);
             box.SetText(displayText);
+            box.gameObject.SetActive(true);
+
+            // 没有原版强化说明时，隐藏原版空状态提示。
+            if (__instance.emptyUpgradeObject != null)
+            {
+                __instance.emptyUpgradeObject.SetActive(false);
+            }
 
             Canvas.ForceUpdateCanvases();
 
@@ -230,13 +249,12 @@ namespace LobCorpWeaponExpansion
                 RectTransform.Axis.Vertical,
                 rowHeight);
 
-            // 为文字增加额外空间，随后重新计算位置。
             float extraHeight = rowHeight + 12f;
 
-            state.ActionTabRect.sizeDelta =
+            state.UpgradesTabRect.sizeDelta =
                 new Vector2(
-                    state.OriginalActionTabSize.x,
-                    state.OriginalActionTabSize.y + extraHeight);
+                    state.OriginalUpgradesTabSize.x,
+                    state.OriginalUpgradesTabSize.y + extraHeight);
 
             state.ContentPanelRect.sizeDelta =
                 new Vector2(
@@ -253,7 +271,7 @@ namespace LobCorpWeaponExpansion
             PositionDescriptionRow(state, rowHeight);
 
             LayoutRebuilder.ForceRebuildLayoutImmediate(
-                state.ActionTabRect);
+                state.UpgradesTabRect);
 
             LayoutRebuilder.ForceRebuildLayoutImmediate(
                 state.ContentPanelRect);
@@ -261,27 +279,132 @@ namespace LobCorpWeaponExpansion
             Canvas.ForceUpdateCanvases();
 
             Debug.Log(
-                "[脑叶武器扩展][描述] 自定义描述已处理。" +
+                "[脑叶武器扩展][描述] 强化页签描述已处理。" +
                 " Tier1=" + hasTier1 +
                 "，Flavor=" + hasFlavor +
                 "，文本宽度=" + width +
                 "，文本高度=" + rowHeight +
-                "，ActionTabActive=" +
-                state.ActionTabRect.gameObject.activeInHierarchy);
+                "，UpgradesTabActive=" +
+                state.UpgradesTabRect.gameObject.activeInHierarchy);
+        }
+
+        /// <summary>
+        /// 原版 SetupTabs 根据 WeaponAddon 数量决定页签是否可用。
+        /// 赤瞳&忏悔使用自定义描述，因此手动将强化页签加入
+        /// activeTabIndices，并重新应用当前页签选择。
+        /// </summary>
+        private static void EnsureUpgradesTabSelectable(
+            UI_WeaponTooltip instance,
+            TooltipState state)
+        {
+            if (instance == null ||
+                state == null ||
+                state.UpgradesTabRect == null)
+            {
+                return;
+            }
+
+            UI_WeaponTooltip.TabElement[] tabs =
+                instance.tabElements;
+
+            if (tabs == null || tabs.Length == 0)
+            {
+                Debug.LogWarning(
+                    "[脑叶武器扩展][页签] tabElements 为空。");
+                return;
+            }
+
+            // 查找 UpgradesTab 对应的原版页签索引。
+            int upgradesIndex = -1;
+
+            for (int i = 0; i < tabs.Length; i++)
+            {
+                UI_WeaponTooltip.TabElement tab = tabs[i];
+
+                if (tab == null || tab.tabContent == null)
+                    continue;
+
+                if (tab.tabContent == state.UpgradesTabRect)
+                {
+                    upgradesIndex = i;
+                    break;
+                }
+            }
+
+            if (upgradesIndex < 0)
+            {
+                Debug.LogWarning(
+                    "[脑叶武器扩展][页签] tabElements 中找不到 " +
+                    "与 UpgradesTab 对应的页签。");
+                return;
+            }
+
+            // 访问原版私有字段 activeTabIndices。
+            var activeIndicesField = AccessTools.Field(
+                typeof(UI_WeaponTooltip),
+                "activeTabIndices");
+
+            // 访问原版私有方法 ApplyTabSelection。
+            var applyTabSelectionMethod = AccessTools.Method(
+                typeof(UI_WeaponTooltip),
+                "ApplyTabSelection");
+
+            if (activeIndicesField == null ||
+                applyTabSelectionMethod == null)
+            {
+                Debug.LogError(
+                    "[脑叶武器扩展][页签] 无法访问原版页签控制成员。");
+                return;
+            }
+
+            var activeIndices =
+                activeIndicesField.GetValue(instance) as List<int>;
+
+            if (activeIndices == null)
+            {
+                Debug.LogError(
+                    "[脑叶武器扩展][页签] 无法读取 activeTabIndices。");
+                return;
+            }
+
+            // 避免重复加入。
+            if (!activeIndices.Contains(upgradesIndex))
+            {
+                activeIndices.Add(upgradesIndex);
+            }
+
+            // 原版只在多个页签可用时显示切换提示。
+            if (instance.tabMovementGuideObject != null)
+            {
+                instance.tabMovementGuideObject.SetActive(
+                    activeIndices.Count > 1);
+            }
+
+            // 刷新页签显示。
+            // 保留原本选中的页签，不强制跳到《强化》。
+            applyTabSelectionMethod.Invoke(instance, null);
+
+            Debug.Log(
+                "[脑叶武器扩展][页签] 已确保强化页签可切换。" +
+                " Index=" + upgradesIndex +
+                "，ActiveTabCount=" + activeIndices.Count +
+                "，CurrentUpgradesTabActive=" +
+                state.UpgradesTabRect.gameObject.activeSelf);
         }
 
         private static void PositionDescriptionRow(
             TooltipState state,
             float rowHeight)
         {
-            RectTransform parent = state.ActionTabRect;
+            RectTransform parent = state.UpgradesTabRect;
+
             RectTransform rowRect =
                 state.DescriptionBox.GetComponent<RectTransform>();
 
-            // 存在布局组件时，让 Unity 负责纵向排列。
             LayoutGroup layoutGroup =
                 parent.GetComponent<LayoutGroup>();
 
+            // 如果强化页签使用布局组件，则由 Unity 自动排列。
             if (layoutGroup != null)
             {
                 LayoutElement layoutElement =
@@ -304,60 +427,72 @@ namespace LobCorpWeaponExpansion
                 return;
             }
 
-            // 没有布局组件时，找出普通攻击、冲刺、防御等
-            // SubWeapon 行的最下沿。
+            // 没有布局组件时，放在原有强化文本的下方。
+            bool foundActiveRow = false;
             float lowestBottom = float.PositiveInfinity;
-            bool foundRow = false;
 
             Vector3[] corners = new Vector3[4];
 
-            for (int i = 0; i < parent.childCount; i++)
+            foreach (UI_SimpleTextBox box in state.OriginalBoxes)
             {
-                Transform child = parent.GetChild(i);
-
-                if (child == state.DescriptionBox.transform ||
-                    !child.name.StartsWith(
-                        "SubWeapon",
-                        StringComparison.Ordinal) ||
-                    !child.gameObject.activeSelf)
+                if (box == null ||
+                    !box.gameObject.activeSelf)
                 {
                     continue;
                 }
 
-                RectTransform rect = child as RectTransform;
+                RectTransform rect =
+                    box.GetComponent<RectTransform>();
 
                 if (rect == null)
                     continue;
 
                 rect.GetWorldCorners(corners);
 
-                for (int j = 0; j < corners.Length; j++)
+                for (int i = 0; i < corners.Length; i++)
                 {
                     float localY =
-                        parent.InverseTransformPoint(corners[j]).y;
+                        parent.InverseTransformPoint(corners[i]).y;
 
                     lowestBottom = Mathf.Min(
                         lowestBottom,
                         localY);
                 }
 
-                foundRow = true;
+                foundActiveRow = true;
             }
 
-            if (!foundRow)
+            if (!foundActiveRow)
             {
-                Debug.LogWarning(
-                    "[脑叶武器扩展][描述] 没有找到可定位的 SubWeapon 行。");
+                // 没有其他强化行时，使用原版第一行的位置。
+                foreach (UI_SimpleTextBox box in state.OriginalBoxes)
+                {
+                    if (box == null)
+                        continue;
+
+                    RectTransform rect =
+                        box.GetComponent<RectTransform>();
+
+                    if (rect == null)
+                        continue;
+
+                    rowRect.position = rect.position;
+                    return;
+                }
+
                 rowRect.anchoredPosition = new Vector2(0f, -8f);
                 return;
             }
 
-            // 描述框采用顶部锚点，因此其顶部放在最后一行动作下方。
-            float targetTopY = lowestBottom - 8f;
+            Vector3 localPosition =
+                parent.InverseTransformPoint(rowRect.position);
 
-            rowRect.anchoredPosition = new Vector2(
-                0f,
-                targetTopY - parent.rect.yMax);
+            localPosition.y =
+                lowestBottom - 8f -
+                rowRect.rect.height * (1f - rowRect.pivot.y);
+
+            rowRect.position =
+                parent.TransformPoint(localPosition);
         }
 
         private static WeaponEntity ResolveWeapon(ITooltip data)
@@ -391,13 +526,15 @@ namespace LobCorpWeaponExpansion
             Transform contentPanel =
                 instance.transform.Find("ContentPanel");
 
-            Transform actionTab =
-                instance.transform.Find("ContentPanel/ActionTab");
+            Transform upgradesTab =
+                instance.transform.Find(
+                    "ContentPanel/UpgradesTab");
 
-            if (contentPanel == null || actionTab == null)
+            if (contentPanel == null || upgradesTab == null)
             {
                 Debug.LogWarning(
-                    "[脑叶武器扩展][描述] 找不到 ContentPanel/ActionTab。");
+                    "[脑叶武器扩展][描述] 找不到 " +
+                    "ContentPanel/UpgradesTab。");
                 return null;
             }
 
@@ -408,7 +545,7 @@ namespace LobCorpWeaponExpansion
             {
                 Debug.LogWarning(
                     "[脑叶武器扩展][描述] upgradeTextBoxes 为空，" +
-                    "无法创建描述框。");
+                    "无法创建强化描述框。");
                 return null;
             }
 
@@ -436,19 +573,20 @@ namespace LobCorpWeaponExpansion
             RectTransform contentPanelRect =
                 contentPanel as RectTransform;
 
-            RectTransform actionTabRect =
-                actionTab as RectTransform;
+            RectTransform upgradesTabRect =
+                upgradesTab as RectTransform;
 
             if (tooltipRect == null ||
                 contentPanelRect == null ||
-                actionTabRect == null)
+                upgradesTabRect == null)
             {
                 return null;
             }
 
+            // 关键修改：描述框创建在 UpgradesTab 下。
             GameObject clone = UnityEngine.Object.Instantiate(
                 template.gameObject,
-                actionTab,
+                upgradesTab,
                 false);
 
             clone.name =
@@ -468,15 +606,17 @@ namespace LobCorpWeaponExpansion
             TooltipState state = new TooltipState
             {
                 DescriptionBox = descriptionBox,
+                OriginalBoxes = boxes,
+
                 TooltipRect = tooltipRect,
                 ContentPanelRect = contentPanelRect,
-                ActionTabRect = actionTabRect,
+                UpgradesTabRect = upgradesTabRect,
 
                 OriginalTooltipSize = tooltipRect.sizeDelta,
                 OriginalContentPanelSize =
                     contentPanelRect.sizeDelta,
-                OriginalActionTabSize =
-                    actionTabRect.sizeDelta
+                OriginalUpgradesTabSize =
+                    upgradesTabRect.sizeDelta
             };
 
             States[instance] = state;

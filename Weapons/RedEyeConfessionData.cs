@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace LobCorpWeaponExpansion
 {
@@ -260,7 +261,7 @@ namespace LobCorpWeaponExpansion
         }
 
         private static bool TryLoadTexts(
-            out RedEyeConfessionTexts result)
+    out RedEyeConfessionTexts result)
         {
             if (textsLoadAttempted)
             {
@@ -285,6 +286,10 @@ namespace LobCorpWeaponExpansion
                     DirectoryId.ToString(),
                     "texts.json");
 
+                Debug.Log(
+                    "[脑叶武器扩展][文本] 实际读取路径：" +
+                    textsPath);
+
                 if (!File.Exists(textsPath))
                 {
                     Debug.LogError(
@@ -296,20 +301,76 @@ namespace LobCorpWeaponExpansion
 
                 string json = File.ReadAllText(textsPath);
 
-                RedEyeConfessionTexts loaded =
-                    JsonUtility.FromJson<RedEyeConfessionTexts>(json);
-
-                if (loaded == null || loaded.entries == null)
+                // 不再一次性反序列化整个 entries 数组。
+                // 先提取数组，再逐个解析每个文本条目。
+                if (!TryExtractJsonArray(
+                        json,
+                        "entries",
+                        out string entriesJson))
                 {
                     Debug.LogError(
-                        "[脑叶武器扩展][文本] texts.json 解析失败。");
+                        "[脑叶武器扩展][文本] 无法提取 entries 数组。");
 
                     return false;
                 }
 
+                if (!TryExtractJsonObjectsFromArray(
+                        entriesJson,
+                        out List<string> entryObjects))
+                {
+                    Debug.LogError(
+                        "[脑叶武器扩展][文本] entries 中没有可解析的对象。");
+
+                    return false;
+                }
+
+                List<RedEyeConfessionTextEntry> parsedEntries =
+                    new List<RedEyeConfessionTextEntry>();
+
+                foreach (string entryJson in entryObjects)
+                {
+                    RedEyeConfessionTextEntry entry =
+                        JsonUtility.FromJson<RedEyeConfessionTextEntry>(
+                            entryJson);
+
+                    if (entry == null ||
+                        string.IsNullOrWhiteSpace(entry.key))
+                    {
+                        Debug.LogWarning(
+                            "[脑叶武器扩展][文本] 跳过无效的文本条目：" +
+                            entryJson);
+
+                        continue;
+                    }
+
+                    parsedEntries.Add(entry);
+
+                    Debug.Log(
+                        "[脑叶武器扩展][文本] 已解析条目：" +
+                        entry.key);
+                }
+
+                if (parsedEntries.Count == 0)
+                {
+                    Debug.LogError(
+                        "[脑叶武器扩展][文本] 没有成功解析任何文本条目。");
+
+                    return false;
+                }
+
+                RedEyeConfessionTexts loaded =
+                    new RedEyeConfessionTexts
+                    {
+                        entries = parsedEntries.ToArray()
+                    };
+
                 texts = loaded;
                 result = loaded;
                 textsLoadSucceeded = true;
+
+                Debug.Log(
+                    "[脑叶武器扩展][文本] texts.json 解析成功。" +
+                    " 条目数=" + loaded.entries.Length);
 
                 return true;
             }
@@ -322,7 +383,156 @@ namespace LobCorpWeaponExpansion
                 return false;
             }
         }
+        private static bool TryExtractJsonArray(
+    string json,
+    string propertyName,
+    out string arrayJson)
+        {
+            arrayJson = null;
 
+            if (string.IsNullOrEmpty(json) ||
+                string.IsNullOrEmpty(propertyName))
+            {
+                return false;
+            }
+
+            string token = "\"" + propertyName + "\"";
+
+            int keyIndex = json.IndexOf(
+                token,
+                StringComparison.Ordinal);
+
+            if (keyIndex < 0)
+                return false;
+
+            int colonIndex = json.IndexOf(
+                ':',
+                keyIndex + token.Length);
+
+            if (colonIndex < 0)
+                return false;
+
+            int start = colonIndex + 1;
+
+            while (start < json.Length &&
+                   char.IsWhiteSpace(json[start]))
+            {
+                start++;
+            }
+
+            if (start >= json.Length || json[start] != '[')
+                return false;
+
+            int depth = 0;
+            bool inString = false;
+            bool escaped = false;
+
+            for (int i = start; i < json.Length; i++)
+            {
+                char c = json[i];
+
+                if (inString)
+                {
+                    if (escaped)
+                        escaped = false;
+                    else if (c == '\\')
+                        escaped = true;
+                    else if (c == '"')
+                        inString = false;
+
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    inString = true;
+                }
+                else if (c == '[')
+                {
+                    depth++;
+                }
+                else if (c == ']')
+                {
+                    depth--;
+
+                    if (depth == 0)
+                    {
+                        arrayJson = json.Substring(
+                            start,
+                            i - start + 1);
+
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryExtractJsonObjectsFromArray(
+            string arrayJson,
+            out List<string> objects)
+        {
+            objects = new List<string>();
+
+            if (string.IsNullOrEmpty(arrayJson))
+                return false;
+
+            bool inString = false;
+            bool escaped = false;
+            int depth = 0;
+            int objectStart = -1;
+
+            for (int i = 0; i < arrayJson.Length; i++)
+            {
+                char c = arrayJson[i];
+
+                if (inString)
+                {
+                    if (escaped)
+                        escaped = false;
+                    else if (c == '\\')
+                        escaped = true;
+                    else if (c == '"')
+                        inString = false;
+
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    inString = true;
+                }
+                else if (c == '{')
+                {
+                    if (depth == 0)
+                        objectStart = i;
+
+                    depth++;
+                }
+                else if (c == '}')
+                {
+                    depth--;
+
+                    if (depth < 0)
+                        return false;
+
+                    if (depth == 0 && objectStart >= 0)
+                    {
+                        objects.Add(
+                            arrayJson.Substring(
+                                objectStart,
+                                i - objectStart + 1));
+
+                        objectStart = -1;
+                    }
+                }
+            }
+
+            return depth == 0 &&
+                   !inString &&
+                   objects.Count > 0;
+        }
         private static bool TryExtractJsonObject(
     string json,
     string propertyName,
