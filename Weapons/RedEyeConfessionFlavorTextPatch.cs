@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Reflection;
 
 namespace LobCorpWeaponExpansion
 {
@@ -294,102 +295,92 @@ namespace LobCorpWeaponExpansion
         /// activeTabIndices，并重新应用当前页签选择。
         /// </summary>
         private static void EnsureUpgradesTabSelectable(
-            UI_WeaponTooltip instance,
-            TooltipState state)
+    UI_WeaponTooltip instance,
+    TooltipState state)
         {
             if (instance == null ||
                 state == null ||
-                state.UpgradesTabRect == null)
+                state.UpgradesTabRect == null ||
+                instance.tabElements == null)
             {
                 return;
             }
 
-            UI_WeaponTooltip.TabElement[] tabs =
-                instance.tabElements;
+            // 找到强化页签在原版 tabElements 中的索引。
+            int upgradeTabIndex = -1;
 
-            if (tabs == null || tabs.Length == 0)
+            for (int i = 0; i < instance.tabElements.Length; i++)
             {
-                Debug.LogWarning(
-                    "[脑叶武器扩展][页签] tabElements 为空。");
-                return;
-            }
+                UI_WeaponTooltip.TabElement tab = instance.tabElements[i];
 
-            // 查找 UpgradesTab 对应的原版页签索引。
-            int upgradesIndex = -1;
-
-            for (int i = 0; i < tabs.Length; i++)
-            {
-                UI_WeaponTooltip.TabElement tab = tabs[i];
-
-                if (tab == null || tab.tabContent == null)
-                    continue;
-
-                if (tab.tabContent == state.UpgradesTabRect)
+                if (tab != null &&
+                    tab.tabContent == state.UpgradesTabRect)
                 {
-                    upgradesIndex = i;
+                    upgradeTabIndex = i;
                     break;
                 }
             }
 
-            if (upgradesIndex < 0)
+            if (upgradeTabIndex < 0)
             {
                 Debug.LogWarning(
-                    "[脑叶武器扩展][页签] tabElements 中找不到 " +
-                    "与 UpgradesTab 对应的页签。");
+                    "[脑叶武器扩展] 未找到强化页签，无法设置默认页签。");
                 return;
             }
 
-            // 访问原版私有字段 activeTabIndices。
-            var activeIndicesField = AccessTools.Field(
-                typeof(UI_WeaponTooltip),
-                "activeTabIndices");
+            // 访问原版的私有字段和方法。
+            const BindingFlags flags =
+                BindingFlags.Instance | BindingFlags.NonPublic;
 
-            // 访问原版私有方法 ApplyTabSelection。
-            var applyTabSelectionMethod = AccessTools.Method(
-                typeof(UI_WeaponTooltip),
-                "ApplyTabSelection");
+            FieldInfo activeIndicesField =
+                typeof(UI_WeaponTooltip).GetField(
+                    "activeTabIndices", flags);
+
+            FieldInfo currentTabIndexField =
+                typeof(UI_WeaponTooltip).GetField(
+                    "currentTabIndex", flags);
+
+            MethodInfo applyTabSelectionMethod =
+                typeof(UI_WeaponTooltip).GetMethod(
+                    "ApplyTabSelection", flags);
 
             if (activeIndicesField == null ||
+                currentTabIndexField == null ||
                 applyTabSelectionMethod == null)
             {
                 Debug.LogError(
-                    "[脑叶武器扩展][页签] 无法访问原版页签控制成员。");
+                    "[脑叶武器扩展] 无法访问 UI_WeaponTooltip 的页签字段或方法。");
                 return;
             }
 
-            var activeIndices =
+            List<int> activeTabIndices =
                 activeIndicesField.GetValue(instance) as List<int>;
 
-            if (activeIndices == null)
+            if (activeTabIndices == null)
             {
                 Debug.LogError(
-                    "[脑叶武器扩展][页签] 无法读取 activeTabIndices。");
+                    "[脑叶武器扩展] activeTabIndices 获取失败。");
                 return;
             }
 
-            // 避免重复加入。
-            if (!activeIndices.Contains(upgradesIndex))
+            // 如果原版没有将强化页签列为可切换页签，则补入。
+            if (!activeTabIndices.Contains(upgradeTabIndex))
             {
-                activeIndices.Add(upgradesIndex);
+                activeTabIndices.Add(upgradeTabIndex);
             }
 
-            // 原版只在多个页签可用时显示切换提示。
+            // 更新页签切换提示。
             if (instance.tabMovementGuideObject != null)
             {
                 instance.tabMovementGuideObject.SetActive(
-                    activeIndices.Count > 1);
+                    activeTabIndices.Count > 1);
             }
 
-            // 刷新页签显示。
-            // 保留原本选中的页签，不强制跳到《强化》。
-            applyTabSelectionMethod.Invoke(instance, null);
+            // 关键修复：明确选择强化页签，而不是沿用原版选择结果。
+            currentTabIndexField.SetValue(instance, upgradeTabIndex);
 
-            Debug.Log(
-                "[脑叶武器扩展][页签] 已确保强化页签可切换。" +
-                " Index=" + upgradesIndex +
-                "，ActiveTabCount=" + activeIndices.Count +
-                "，CurrentUpgradesTabActive=" +
-                state.UpgradesTabRect.gameObject.activeSelf);
+            // 立即刷新页签显示。
+            applyTabSelectionMethod.Invoke(instance, null);
         }
 
         private static void PositionDescriptionRow(
