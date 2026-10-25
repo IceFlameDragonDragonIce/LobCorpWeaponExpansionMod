@@ -1,16 +1,18 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Text.RegularExpressions;
 using HarmonyLib;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Reflection;
 
 namespace LobCorpWeaponExpansion
 {
     /// <summary>
-    /// 在武器详情的 UpgradesTab 中显示自定义描述。
-    /// 优先显示 Tier1，再显示 Flavor。
-    /// 不向 ActionTab 添加自定义描述。
+    /// 在武器详情的 UpgradesTab 中显示自定义描述，
+    /// 并将自定义招式关键词详情注册到武器详情的 keywordViewer。
     /// </summary>
     internal static class RedEyeConfessionFlavorTextPatch
     {
@@ -43,7 +45,7 @@ namespace LobCorpWeaponExpansion
             if (harmony != null)
                 return;
 
-            var openMethod = AccessTools.Method(
+            MethodInfo openMethod = AccessTools.Method(
                 typeof(UI_WeaponTooltip),
                 "Open",
                 new Type[]
@@ -59,22 +61,62 @@ namespace LobCorpWeaponExpansion
                 Debug.LogError(
                     "[脑叶武器扩展] 找不到 UI_WeaponTooltip.Open，" +
                     "描述补丁未启用。");
+
                 return;
             }
 
+            MethodInfo keywordMethod = AccessTools.Method(
+                typeof(UI_WeaponTooltip),
+                "OpenKeywordsCoroutine");
+
             harmony = new Harmony(HarmonyId);
 
-            harmony.Patch(
-                openMethod,
-                prefix: new HarmonyMethod(
-                    typeof(RedEyeConfessionFlavorTextPatch),
-                    nameof(Prefix)),
-                postfix: new HarmonyMethod(
-                    typeof(RedEyeConfessionFlavorTextPatch),
-                    nameof(Postfix)));
+            try
+            {
+                // 原有功能：创建并显示强化页签的自定义说明。
+                harmony.Patch(
+                    openMethod,
+                    prefix: new HarmonyMethod(
+                        typeof(RedEyeConfessionFlavorTextPatch),
+                        nameof(Prefix)),
+                    postfix: new HarmonyMethod(
+                        typeof(RedEyeConfessionFlavorTextPatch),
+                        nameof(Postfix)));
 
-            Debug.Log(
-                "[脑叶武器扩展] 赤瞳&忏悔强化描述补丁已启用。");
+                // 新增功能：把自定义说明中的招式关键词
+                // 补充到当前武器详情的关键词查看器。
+                if (keywordMethod != null)
+                {
+                    harmony.Patch(
+                        keywordMethod,
+                        postfix: new HarmonyMethod(
+                            typeof(RedEyeConfessionFlavorTextPatch),
+                            nameof(OpenKeywordsCoroutinePostfix)));
+
+                    Debug.Log(
+                        "[脑叶武器扩展][招式详情] " +
+                        "OpenKeywordsCoroutine 补丁已安装。");
+                }
+                else
+                {
+                    Debug.LogError(
+                        "[脑叶武器扩展][招式详情] " +
+                        "找不到 OpenKeywordsCoroutine，" +
+                        "无法补充武器详情的关键词悬停。");
+                }
+
+                Debug.Log(
+                    "[脑叶武器扩展] 赤瞳&忏悔强化描述补丁已启用。");
+            }
+            catch (Exception exception)
+            {
+                harmony.UnpatchAll(HarmonyId);
+                harmony = null;
+
+                Debug.LogError(
+                    "[脑叶武器扩展] 安装武器详情补丁失败：" +
+                    exception);
+            }
         }
 
         internal static void Unapply()
@@ -138,12 +180,12 @@ namespace LobCorpWeaponExpansion
 
             RestoreSizes(state);
 
-            state.DescriptionBox.SetText("");
+            state.DescriptionBox.SetText(string.Empty);
             state.DescriptionBox.gameObject.SetActive(false);
         }
 
         /// <summary>
-        /// 只在目标武器的强化页签中准备自定义描述。
+        /// 只为赤瞳&忏悔准备强化页签的自定义描述。
         /// </summary>
         private static void Postfix(
             UI_WeaponTooltip __instance,
@@ -166,7 +208,6 @@ namespace LobCorpWeaponExpansion
             if (state == null)
                 return;
 
-            // 将《强化》页签加入可切换列表。
             EnsureUpgradesTabSelectable(__instance, state);
 
             string tier1Key =
@@ -195,6 +236,7 @@ namespace LobCorpWeaponExpansion
                     "[脑叶武器扩展][描述] 没有有效的自定义文本。" +
                     " Tier1Key=" + tier1Key +
                     "，FlavorKey=" + flavorKey);
+
                 return;
             }
 
@@ -209,6 +251,9 @@ namespace LobCorpWeaponExpansion
                 displayText = hasTier1 ? tier1 : flavor;
             }
 
+            // 转换 <tag=...>，生成游戏可识别的关键词链接。
+            displayText = ConvertKeywordText(displayText);
+
             UI_SimpleTextBox box = state.DescriptionBox;
 
             RectTransform boxRect =
@@ -218,7 +263,6 @@ namespace LobCorpWeaponExpansion
                 1f,
                 state.UpgradesTabRect.rect.width - 16f);
 
-            // 描述框属于 UpgradesTab，不属于 ActionTab。
             boxRect.anchorMin = new Vector2(0f, 1f);
             boxRect.anchorMax = new Vector2(1f, 1f);
             boxRect.pivot = new Vector2(0.5f, 1f);
@@ -228,7 +272,6 @@ namespace LobCorpWeaponExpansion
             box.SetText(displayText);
             box.gameObject.SetActive(true);
 
-            // 没有原版强化说明时，隐藏原版空状态提示。
             if (__instance.emptyUpgradeObject != null)
             {
                 __instance.emptyUpgradeObject.SetActive(false);
@@ -290,13 +333,247 @@ namespace LobCorpWeaponExpansion
         }
 
         /// <summary>
-        /// 原版 SetupTabs 根据 WeaponAddon 数量决定页签是否可用。
-        /// 赤瞳&忏悔使用自定义描述，因此手动将强化页签加入
-        /// activeTabIndices，并重新应用当前页签选择。
+        /// 将本地化描述中的关键词标签转换为游戏链接。
+        /// </summary>
+        private static string ConvertKeywordText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return string.Empty;
+
+            try
+            {
+                string converted = KeywordDatabase.Convert(
+                    KeywordDatabase.Convert(text));
+
+                return converted ?? text;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[脑叶武器扩展][描述] 关键词转换失败：" +
+                    exception);
+
+                return text;
+            }
+        }
+
+        /// <summary>
+        /// 原版关键词协程完成后，补充我们自定义说明框中的关键词。
+        /// </summary>
+        private static void OpenKeywordsCoroutinePostfix(
+            UI_WeaponTooltip __instance,
+            ref IEnumerator __result)
+        {
+            if (__instance == null || __result == null)
+                return;
+
+            IEnumerator original = __result;
+
+            __result = RunOriginalThenAddCustomKeywords(
+                original,
+                __instance);
+        }
+
+        private static IEnumerator RunOriginalThenAddCustomKeywords(
+            IEnumerator original,
+            UI_WeaponTooltip instance)
+        {
+            // 先完整执行原版逻辑，保留原版关键词的悬停详情。
+            yield return original;
+
+            try
+            {
+                AddCustomKeywordDetails(instance);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[脑叶武器扩展][招式详情] " +
+                    "补充自定义关键词失败：" +
+                    exception);
+            }
+        }
+
+        /// <summary>
+        /// 只把赤瞳&忏悔自定义说明中实际出现的招式关键词
+        /// 加入当前武器详情的 keywordViewer。
+        /// </summary>
+        private static void AddCustomKeywordDetails(
+            UI_WeaponTooltip instance)
+        {
+            if (instance == null ||
+                !States.TryGetValue(
+                    instance,
+                    out TooltipState state) ||
+                state == null ||
+                state.DescriptionBox == null ||
+                !state.DescriptionBox.gameObject.activeInHierarchy ||
+                instance.keywordViewer == null)
+            {
+                return;
+            }
+
+            TMP_Text text = state.DescriptionBox.text;
+
+            if (text == null)
+                return;
+
+            // 确保 TextMeshPro 的链接信息已经生成。
+            text.ForceMeshUpdate();
+
+            string customKeywordId =
+                RedEyeConfessionActionKeywordPatch.Keyword;
+
+            bool foundCustomKeyword = false;
+
+            for (int i = 0; i < text.textInfo.linkCount; i++)
+            {
+                string linkId =
+                    text.textInfo.linkInfo[i].GetLinkID();
+
+                if (string.Equals(
+                    linkId,
+                    customKeywordId,
+                    StringComparison.Ordinal))
+                {
+                    foundCustomKeyword = true;
+                    break;
+                }
+            }
+
+            if (!foundCustomKeyword)
+            {
+                Debug.Log(
+                    "[脑叶武器扩展][招式详情] " +
+                    "当前说明框没有找到自定义招式链接。");
+
+                return;
+            }
+
+            KeywordEntity customKeyword =
+                KeywordDatabase.GetEntity(customKeywordId);
+
+            if (customKeyword == null)
+            {
+                Debug.LogWarning(
+                    "[脑叶武器扩展][招式详情] " +
+                    "自定义 KeywordEntity 不存在：" +
+                    customKeywordId);
+
+                return;
+            }
+
+            if (!customKeyword.displayDetails)
+            {
+                Debug.LogWarning(
+                    "[脑叶武器扩展][招式详情] " +
+                    "自定义关键词的 displayDetails 未开启：" +
+                    customKeywordId);
+
+                return;
+            }
+
+            // 以自定义关键词作为起点，递归收集其描述中
+            // 引用且允许显示详情的其他关键词。
+            HashSet<string> keywordIds =
+                new HashSet<string>();
+
+            Queue<string> pendingIds =
+                new Queue<string>();
+
+            keywordIds.Add(customKeywordId);
+            pendingIds.Enqueue(customKeywordId);
+
+            while (pendingIds.Count > 0)
+            {
+                string currentId = pendingIds.Dequeue();
+
+                KeywordEntity currentEntity =
+                    KeywordDatabase.GetEntity(currentId);
+
+                if (currentEntity == null)
+                    continue;
+
+                string rawDescription =
+                    currentEntity.GetRawDescription();
+
+                if (string.IsNullOrEmpty(rawDescription))
+                    continue;
+
+                MatchCollection matches =
+                    Regex.Matches(
+                        rawDescription,
+                        @"<tag=(.*?)>");
+
+                foreach (Match match in matches)
+                {
+                    if (!match.Groups[1].Success)
+                        continue;
+
+                    string childId = match.Groups[1].Value;
+
+                    KeywordEntity childEntity =
+                        KeywordDatabase.GetEntity(childId);
+
+                    if (childEntity == null ||
+                        !childEntity.displayDetails)
+                    {
+                        continue;
+                    }
+
+                    if (keywordIds.Add(childEntity.keyword))
+                    {
+                        pendingIds.Enqueue(childEntity.keyword);
+                    }
+                }
+            }
+
+            int addedCount = 0;
+
+            foreach (string keywordId in keywordIds)
+            {
+                KeywordEntity keyword =
+                    KeywordDatabase.GetEntity(keywordId);
+
+                if (keyword == null)
+                    continue;
+
+                string rawDescription =
+                    keyword.GetRawDescription();
+
+                string detailText = KeywordDatabase.Convert(
+                    rawDescription,
+                    useColor: false,
+                    useSprite: false);
+
+                if (detailText == null)
+                    detailText = string.Empty;
+
+                // 与其他模组的 UI_WeaponTooltip 处理方式一致，
+                // 将关键词和说明加入当前窗口的详情查看器。
+                instance.keywordViewer.AddKeyword(
+                    keyword.Convert_Details(
+                        useColor: false,
+                        useSprite: false),
+                    detailText);
+
+                addedCount++;
+            }
+
+            Debug.Log(
+                "[脑叶武器扩展][招式详情] " +
+                "已补充武器详情的自定义关键词。" +
+                " Keyword=" + customKeywordId +
+                "，LinkCount=" + text.textInfo.linkCount +
+                "，Added=" + addedCount);
+        }
+
+        /// <summary>
+        /// 确保自定义武器的强化页签可以切换。
         /// </summary>
         private static void EnsureUpgradesTabSelectable(
-    UI_WeaponTooltip instance,
-    TooltipState state)
+            UI_WeaponTooltip instance,
+            TooltipState state)
         {
             if (instance == null ||
                 state == null ||
@@ -306,12 +583,12 @@ namespace LobCorpWeaponExpansion
                 return;
             }
 
-            // 找到强化页签在原版 tabElements 中的索引。
             int upgradeTabIndex = -1;
 
             for (int i = 0; i < instance.tabElements.Length; i++)
             {
-                UI_WeaponTooltip.TabElement tab = instance.tabElements[i];
+                UI_WeaponTooltip.TabElement tab =
+                    instance.tabElements[i];
 
                 if (tab != null &&
                     tab.tabContent == state.UpgradesTabRect)
@@ -324,32 +601,38 @@ namespace LobCorpWeaponExpansion
             if (upgradeTabIndex < 0)
             {
                 Debug.LogWarning(
-                    "[脑叶武器扩展] 未找到强化页签，无法设置默认页签。");
+                    "[脑叶武器扩展] 未找到强化页签，" +
+                    "无法设置默认页签。");
+
                 return;
             }
 
-            // 访问原版的私有字段和方法。
             const BindingFlags flags =
                 BindingFlags.Instance | BindingFlags.NonPublic;
 
             FieldInfo activeIndicesField =
                 typeof(UI_WeaponTooltip).GetField(
-                    "activeTabIndices", flags);
+                    "activeTabIndices",
+                    flags);
 
             FieldInfo currentTabIndexField =
                 typeof(UI_WeaponTooltip).GetField(
-                    "currentTabIndex", flags);
+                    "currentTabIndex",
+                    flags);
 
             MethodInfo applyTabSelectionMethod =
                 typeof(UI_WeaponTooltip).GetMethod(
-                    "ApplyTabSelection", flags);
+                    "ApplyTabSelection",
+                    flags);
 
             if (activeIndicesField == null ||
                 currentTabIndexField == null ||
                 applyTabSelectionMethod == null)
             {
                 Debug.LogError(
-                    "[脑叶武器扩展] 无法访问 UI_WeaponTooltip 的页签字段或方法。");
+                    "[脑叶武器扩展] 无法访问 UI_WeaponTooltip 的" +
+                    "页签字段或方法。");
+
                 return;
             }
 
@@ -360,34 +643,36 @@ namespace LobCorpWeaponExpansion
             {
                 Debug.LogError(
                     "[脑叶武器扩展] activeTabIndices 获取失败。");
+
                 return;
             }
 
-            // 如果原版没有将强化页签列为可切换页签，则补入。
             if (!activeTabIndices.Contains(upgradeTabIndex))
             {
                 activeTabIndices.Add(upgradeTabIndex);
             }
 
-            // 更新页签切换提示。
             if (instance.tabMovementGuideObject != null)
             {
                 instance.tabMovementGuideObject.SetActive(
                     activeTabIndices.Count > 1);
             }
 
-            // 关键修复：明确选择强化页签，而不是沿用原版选择结果。
-            currentTabIndexField.SetValue(instance, upgradeTabIndex);
+            currentTabIndexField.SetValue(
+                instance,
+                upgradeTabIndex);
 
-            // 立即刷新页签显示。
-            applyTabSelectionMethod.Invoke(instance, null);
+            applyTabSelectionMethod.Invoke(
+                instance,
+                null);
         }
 
         private static void PositionDescriptionRow(
             TooltipState state,
             float rowHeight)
         {
-            RectTransform parent = state.UpgradesTabRect;
+            RectTransform parent =
+                state.UpgradesTabRect;
 
             RectTransform rowRect =
                 state.DescriptionBox.GetComponent<RectTransform>();
@@ -395,7 +680,6 @@ namespace LobCorpWeaponExpansion
             LayoutGroup layoutGroup =
                 parent.GetComponent<LayoutGroup>();
 
-            // 如果强化页签使用布局组件，则由 Unity 自动排列。
             if (layoutGroup != null)
             {
                 LayoutElement layoutElement =
@@ -418,7 +702,6 @@ namespace LobCorpWeaponExpansion
                 return;
             }
 
-            // 没有布局组件时，放在原有强化文本的下方。
             bool foundActiveRow = false;
             float lowestBottom = float.PositiveInfinity;
 
@@ -455,7 +738,6 @@ namespace LobCorpWeaponExpansion
 
             if (!foundActiveRow)
             {
-                // 没有其他强化行时，使用原版第一行的位置。
                 foreach (UI_SimpleTextBox box in state.OriginalBoxes)
                 {
                     if (box == null)
@@ -471,7 +753,9 @@ namespace LobCorpWeaponExpansion
                     return;
                 }
 
-                rowRect.anchoredPosition = new Vector2(0f, -8f);
+                rowRect.anchoredPosition =
+                    new Vector2(0f, -8f);
+
                 return;
             }
 
@@ -507,8 +791,8 @@ namespace LobCorpWeaponExpansion
             UI_WeaponTooltip instance)
         {
             if (States.TryGetValue(
-                    instance,
-                    out TooltipState existing))
+                instance,
+                out TooltipState existing))
             {
                 if (existing.DescriptionBox != null)
                     return existing;
@@ -526,6 +810,7 @@ namespace LobCorpWeaponExpansion
                 Debug.LogWarning(
                     "[脑叶武器扩展][描述] 找不到 " +
                     "ContentPanel/UpgradesTab。");
+
                 return null;
             }
 
@@ -537,6 +822,7 @@ namespace LobCorpWeaponExpansion
                 Debug.LogWarning(
                     "[脑叶武器扩展][描述] upgradeTextBoxes 为空，" +
                     "无法创建强化描述框。");
+
                 return null;
             }
 
@@ -554,7 +840,9 @@ namespace LobCorpWeaponExpansion
             if (template == null)
             {
                 Debug.LogWarning(
-                    "[脑叶武器扩展][描述] 找不到可用的 UI_SimpleTextBox。");
+                    "[脑叶武器扩展][描述] " +
+                    "找不到可用的 UI_SimpleTextBox。");
+
                 return null;
             }
 
@@ -574,7 +862,7 @@ namespace LobCorpWeaponExpansion
                 return null;
             }
 
-            // 关键修改：描述框创建在 UpgradesTab 下。
+            // 自定义强化说明仅放在 UpgradesTab。
             GameObject clone = UnityEngine.Object.Instantiate(
                 template.gameObject,
                 upgradesTab,
