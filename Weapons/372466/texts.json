@@ -9,10 +9,10 @@
     },
     {
       "key": "Tier1",
-      "zhCN": "攻击速度增加 15%\n普通攻击时自动触发防御\n普通攻击第三段与冲刺攻击各进行两次打击",
-      "zhTW": "攻擊速度增加 15%\n普通攻擊時自動觸發防禦\n普通攻擊第三段與衝刺攻擊各進行兩次打擊",
-      "enUS": "Attack Speed +15%\nAutomatically guards during a basic attack\nThe third basic-attack combo and dash attack each strike twice",
-      "jaJP": "攻撃速度が 15% 増加\n通常攻撃中に自動でガードする\n通常攻撃の第3段とダッシュ攻撃はそれぞれ2回攻撃する"
+      "zhCN": "攻击速度增加 15%\n<tag=WeaponAction_BasicAttack>时自动触发<tag=WeaponAction_Guard>\n<tag=WeaponAction_BasicAttack>更改为<tag=WeaponAction_LobCorpWeaponExpansion_RedEyeConfession>\n<tag=WeaponAction_DashAttack>变为两连击\n无法主动使用<tag=WeaponAction_SpecialAttack>和<tag=WeaponAction_Guard>",
+      "zhTW": "攻擊速度增加 15%\n<tag=WeaponAction_BasicAttack>時自動觸發<tag=WeaponAction_Guard>\n<tag=WeaponAction_BasicAttack>更改為<tag=WeaponAction_LobCorpWeaponExpansion_RedEyeConfession>\n<tag=WeaponAction_DashAttack>變為兩連擊\n無法主動使用<tag=WeaponAction_SpecialAttack>和<tag=WeaponAction_Guard>",
+      "enUS": "Attack Speed +15%\nAutomatically guards during <tag=WeaponAction_BasicAttack>\n<tag=WeaponAction_BasicAttack> changes to <tag=WeaponAction_LobCorpWeaponExpansion_RedEyeConfession>\n<tag=WeaponAction_DashAttack> becomes a double hit\nCannot actively use <tag=WeaponAction_SpecialAttack> or <tag=WeaponAction_Guard>",
+      "jaJP": "攻撃速度が15%増加\n<tag=WeaponAction_BasicAttack>中に自動で<tag=WeaponAction_Guard>\n<tag=WeaponAction_BasicAttack>が<tag=WeaponAction_LobCorpWeaponExpansion_RedEyeConfession>に変化\n<tag=WeaponAction_DashAttack>が2連撃になる\n<tag=WeaponAction_SpecialAttack>と<tag=WeaponAction_Guard>は能動的に使用できない"
     },
     {
       "key": "Flavor",

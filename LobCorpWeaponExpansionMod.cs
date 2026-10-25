@@ -33,6 +33,9 @@ namespace LobCorpWeaponExpansion
                     HorayModAPI.OnLoadWeaponDatabase +=
                         OnLoadWeaponDatabase;
 
+                    HorayModAPI.OnLoadKeywordDatabase +=
+                            OnLoadKeywordDatabase;
+
                     hooksRegistered = true;
                 }
 
@@ -53,6 +56,20 @@ namespace LobCorpWeaponExpansion
             }
         }
 
+        private void OnLoadKeywordDatabase()
+        {
+            try
+            {
+                RedEyeConfessionActionKeywordPatch.RegisterKeyword();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[脑叶武器扩展] 注册普通攻击关键词失败："
+                    + exception);
+            }
+        }
+
         protected override void OnModUnloaded()
         {
             try
@@ -64,6 +81,9 @@ namespace LobCorpWeaponExpansion
 
                     HorayModAPI.OnLoadWeaponDatabase -=
                         OnLoadWeaponDatabase;
+
+                    HorayModAPI.OnLoadKeywordDatabase -=
+                        OnLoadKeywordDatabase;
 
                     hooksRegistered = false;
                 }
@@ -99,9 +119,11 @@ namespace LobCorpWeaponExpansion
 
         private void OnLocalizationReady(
             HorayModLocalizationContext context)
+
         {
             try
             {
+                RedEyeConfessionActionKeywordPatch.RegisterLocalization(context);
                 RedEyeConfessionWeapon.RegisterLocalization(context);
             }
             catch (Exception exception)
