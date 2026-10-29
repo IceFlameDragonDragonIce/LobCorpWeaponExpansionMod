@@ -1,6 +1,10 @@
-bin/
+﻿bin/
 obj/
 dist/
 .vs/
+.idea/
 *.user
 *.suo
+*.dll
+*.pdb
+*.log
