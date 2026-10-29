@@ -33,7 +33,34 @@ namespace LobCorpWeaponExpansion
         private static bool registered;
 
         internal static int RegisteredWeaponId { get; private set; } = -1;
+        internal const int Tier2WeaponId = 372467;
 
+        internal static int RegisteredTier2WeaponId { get; private set; } = -1;
+
+        internal static string Tier2NameKey =>
+            RedEyeConfessionData.GetTextKey("Tier2Name");
+
+        internal static string Tier2TextKey =>
+            RedEyeConfessionData.GetTextKey("Tier2");
+
+        internal static bool IsTier2WeaponId(int id)
+        {
+            return RegisteredTier2WeaponId >= 0
+                && id == RegisteredTier2WeaponId;
+        }
+
+        internal static bool IsManagedWeaponId(int id)
+        {
+            return id >= 0
+                && (id == RegisteredWeaponId
+                    || id == RegisteredTier2WeaponId);
+        }
+
+        internal static bool IsManagedWeapon(WeaponSimple weapon)
+        {
+            return weapon != null
+                && IsManagedWeaponId(weapon.entityId);
+        }
         internal static void RegisterLocalization(
     HorayModLocalizationContext context)
         {
@@ -87,7 +114,16 @@ namespace LobCorpWeaponExpansion
         internal static void Register()
         {
             if (registered)
+            {
+                if (RegisteredWeaponId >= 0)
+                {
+                    RegisterTier2(
+                        WeaponDatabase.FindWeaponById(
+                            RegisteredWeaponId));
+                }
+
                 return;
+            }
 
             if (!RedEyeConfessionData.TryLoad(
                     out RedEyeConfessionManifest manifest))
@@ -132,7 +168,7 @@ namespace LobCorpWeaponExpansion
                 }
 
                 RegisteredWeaponId = existingWeapon.id;
-
+                RegisterTier2(existingWeapon);
                 Debug.LogWarning(
                     "[脑叶武器扩展] 数据库中已经存在赤瞳&忏悔，" +
                     "跳过重复注册。实际 ID=" + RegisteredWeaponId);
@@ -277,7 +313,7 @@ namespace LobCorpWeaponExpansion
 
             RegisteredWeaponId = customId;
             registered = true;
-
+            RegisterTier2(customWeapon);
             Debug.Log(
                 "[脑叶武器扩展] 赤瞳&忏悔注册完成。" +
                 " WeaponId=" + customId +
@@ -286,6 +322,128 @@ namespace LobCorpWeaponExpansion
                 "，MainPrefab=" +
                 customWeapon.mainWeaponPrefab.name +
                 "，使用原版网络预制体，不创建额外实例。");
+        }
+        private static void RegisterTier2(WeaponEntity baseWeapon)
+        {
+            if (baseWeapon == null
+                || baseWeapon.id != RegisteredWeaponId)
+            {
+                return;
+            }
+
+            try
+            {
+                const string tier2Suffix =
+                    "_" + InternalName + "_Tier2";
+
+                WeaponEntity tier2 =
+                    WeaponDatabase.FindWeaponById(Tier2WeaponId);
+
+                // 防止误覆盖其他模组或游戏原版的武器。
+                if (tier2 != null
+                    && (string.IsNullOrEmpty(tier2.name)
+                        || !tier2.name.EndsWith(
+                            tier2Suffix,
+                            StringComparison.Ordinal)))
+                {
+                    Debug.LogError(
+                        "[脑叶武器扩展] 第二阶段武器 ID 已被占用。" +
+                        " ID=" + Tier2WeaponId +
+                        "，占用者=" + tier2.name);
+
+                    return;
+                }
+
+                if (tier2 == null)
+                {
+                    // 继承基础版武器数据和网络预制体引用。
+                    tier2 = UnityEngine.Object.Instantiate(baseWeapon);
+
+                    tier2.name =
+                        Tier2WeaponId + tier2Suffix;
+
+                    tier2.id = Tier2WeaponId;
+                    tier2.enabled = true;
+
+                    tier2.aName =
+                        new LocalizedString(Tier2NameKey);
+
+                    tier2.mainWeaponPrefab =
+                        baseWeapon.mainWeaponPrefab;
+
+                    tier2.subWeaponPrefab =
+                        baseWeapon.subWeaponPrefab;
+
+                    tier2.icon = baseWeapon.icon;
+                    tier2.bigIcon = baseWeapon.bigIcon;
+
+                    tier2.activeState =
+                        WeaponEntity.EActiveState.Active;
+
+                    tier2.isDefaultWeapon = false;
+                    tier2.enhanceFromId = baseWeapon.id;
+                    tier2.unlockMiniscript = string.Empty;
+
+                    // 第二阶段的强化列表独立于基础版。
+                    tier2.standardEnhancements =
+                        new List<EnhancementMetadata>();
+
+                    WeaponDatabase.Register(tier2);
+
+                    tier2 =
+                        WeaponDatabase.FindWeaponById(Tier2WeaponId);
+
+                    if (tier2 == null)
+                    {
+                        Debug.LogError(
+                            "[脑叶武器扩展] 第二阶段武器注册失败。" +
+                            " ID=" + Tier2WeaponId);
+
+                        return;
+                    }
+                }
+
+                tier2.aName =
+                    new LocalizedString(Tier2NameKey);
+
+                tier2.enhanceFromId = baseWeapon.id;
+
+                if (baseWeapon.standardEnhancements == null)
+                {
+                    baseWeapon.standardEnhancements =
+                        new List<EnhancementMetadata>();
+                }
+
+                bool alreadyLinked =
+                    baseWeapon.standardEnhancements.Any(
+                        enhancement =>
+                            enhancement != null
+                            && enhancement.enhanced != null
+                            && enhancement.enhanced.id == Tier2WeaponId);
+
+                if (!alreadyLinked)
+                {
+                    baseWeapon.standardEnhancements.Add(
+                        new EnhancementMetadata
+                        {
+                            enabled = true,
+                            enhanced = tier2
+                        });
+                }
+
+                RegisteredTier2WeaponId = tier2.id;
+
+                Debug.Log(
+                    "[脑叶武器扩展] 第二阶段武器注册完成。" +
+                    " WeaponId=" + RegisteredTier2WeaponId +
+                    "，EnhanceFromId=" + baseWeapon.id);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[脑叶武器扩展] 注册第二阶段武器失败：" +
+                    exception);
+            }
         }
     }
 }

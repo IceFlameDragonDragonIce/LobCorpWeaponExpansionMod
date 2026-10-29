@@ -8,8 +8,6 @@ namespace LobCorpWeaponExpansion
 {
     /// <summary>
     /// 赤瞳＆忏悔的自动格挡管理器。
-    ///
-    /// 只处理 WeaponId = 14000 的剑盾武器实例。
     /// 使用游戏原版 UnitAvatar 格挡系统，不自行拦截伤害。
     /// </summary>
     internal static class RedEyeConfessionAutoGuard
@@ -17,14 +15,17 @@ namespace LobCorpWeaponExpansion
         // 与原版 StartGuard 使用相同的角度。
         private const float GuardAngle = 190f;
 
-        // 通过反射读取 UnitAvatar 的真实格挡状态，
-        // 不要求 isGuardEnabled 字段必须为 public。
+        // 通过反射读取 UnitAvatar 的真实格挡状态。
         private static readonly FieldInfo GuardEnabledField =
-            AccessTools.Field(typeof(UnitAvatar), "isGuardEnabled");
+            AccessTools.Field(
+                typeof(UnitAvatar),
+                "isGuardEnabled");
 
-        // 作为字段不存在时的备用读取方式。
+        // 字段不存在时，尝试读取网络属性。
         private static readonly PropertyInfo NetworkGuardEnabledProperty =
-            AccessTools.Property(typeof(UnitAvatar), "NetworkisGuardEnabled");
+            AccessTools.Property(
+                typeof(UnitAvatar),
+                "NetworkisGuardEnabled");
 
         private static bool missingGuardStateWarningLogged;
 
@@ -34,34 +35,31 @@ namespace LobCorpWeaponExpansion
             public bool EnabledByThisPatch;
         }
 
-        // 弱引用表避免武器销毁后，管理器长期持有武器实例。
         private static readonly ConditionalWeakTable<
             WeaponSimple_SwordAndShield,
-            GuardSession
-        > Sessions =
-            new ConditionalWeakTable<
-                WeaponSimple_SwordAndShield,
-                GuardSession
-            >();
+            GuardSession> Sessions =
+                new ConditionalWeakTable<
+                    WeaponSimple_SwordAndShield,
+                    GuardSession>();
 
         /// <summary>
         /// 普通攻击开始时尝试开启自动格挡。
         /// </summary>
-        public static void Begin(WeaponSimple_SwordAndShield weapon)
+        internal static void Begin(
+            WeaponSimple_SwordAndShield weapon)
         {
-            int registeredWeaponId =
-                RedEyeConfessionWeapon.RegisteredWeaponId;
             try
             {
                 if (weapon == null
                     || !weapon.isServer
-                    || registeredWeaponId < 0
-                    || weapon.entityId != registeredWeaponId)
+                    || !RedEyeConfessionWeapon.IsManagedWeaponId(
+                        weapon.entityId))
                 {
                     return;
                 }
 
-                WeaponControllerSimple owner = weapon.Networkowner;
+                WeaponControllerSimple owner =
+                    weapon.Networkowner;
 
                 if (owner == null || owner.unitAvatar == null)
                 {
@@ -74,8 +72,7 @@ namespace LobCorpWeaponExpansion
 
                 bool hasSession = Sessions.TryGetValue(
                     weapon,
-                    out session
-                );
+                    out session);
 
                 // 武器更换持有者时，不能把旧角色的格挡状态留住。
                 if (hasSession
@@ -90,12 +87,14 @@ namespace LobCorpWeaponExpansion
                     hasSession = false;
                 }
 
-                if (!TryGetGuardEnabled(avatar, out bool guardAlreadyEnabled))
+                if (!TryGetGuardEnabled(
+                        avatar,
+                        out bool guardAlreadyEnabled))
                 {
                     return;
                 }
 
-                // 已经由本补丁开启的格挡仍然生效时，无须重复开启。
+                // 由本补丁开启且仍在生效的格挡，无须重复开启。
                 if (hasSession
                     && session != null
                     && session.EnabledByThisPatch
@@ -105,36 +104,34 @@ namespace LobCorpWeaponExpansion
                     return;
                 }
 
-                // 如果格挡原本就开启，尊重其他系统或玩家的格挡状态，
-                // 不将它登记成由本补丁开启的格挡。
+                // 如果格挡原本就开启，尊重原版或其他模组的状态。
                 if (guardAlreadyEnabled)
                 {
                     return;
                 }
 
-                // 避免在死亡或没有 MP 时调用 ActivateGuard。
-                // 原版格挡系统仍负责判断格挡是否可用。
                 if (avatar.IsDead)
                 {
                     return;
                 }
 
+                // 沿用原有 MP 检查。
                 if (avatar.GetCustomStatUnsafe("INFINITYMP") <= 0
                     && avatar.MP <= 0)
                 {
                     return;
                 }
 
-                // 启用正常格挡，不由这次调用开启完美格挡。
-                // 格挡 MP 消耗、角度与破防仍沿用游戏自身逻辑。
+                // 开启普通格挡，不主动开启完美格挡。
                 avatar.ActivateGuard(
                     GuardAngle,
                     enablePerfectGuard: false,
                     latency: 0f,
-                    ignoreExternalPower: false
-                );
+                    ignoreExternalPower: false);
 
-                if (!TryGetGuardEnabled(avatar, out bool guardEnabledAfterActivation))
+                if (!TryGetGuardEnabled(
+                        avatar,
+                        out bool guardEnabledAfterActivation))
                 {
                     return;
                 }
@@ -158,27 +155,29 @@ namespace LobCorpWeaponExpansion
             {
                 Debug.LogError(
                     "[脑叶武器扩展] 开启赤瞳＆忏悔自动格挡失败："
-                    + exception
-                );
+                    + exception);
             }
         }
 
         /// <summary>
         /// 普通攻击结束时，只关闭由本补丁开启的格挡。
         /// </summary>
-        public static void End(WeaponSimple_SwordAndShield weapon)
+        internal static void End(
+            WeaponSimple_SwordAndShield weapon)
         {
             if (weapon == null || !weapon.isServer)
             {
                 return;
             }
 
-            if (!Sessions.TryGetValue(weapon, out GuardSession session))
+            if (!Sessions.TryGetValue(
+                    weapon,
+                    out GuardSession session))
             {
                 return;
             }
 
-            // 先删除会话，避免清理过程出现重复调用。
+            // 先删除会话，避免清理过程重复调用。
             Sessions.Remove(weapon);
 
             try
@@ -189,12 +188,12 @@ namespace LobCorpWeaponExpansion
             {
                 Debug.LogError(
                     "[脑叶武器扩展] 关闭赤瞳＆忏悔自动格挡失败："
-                    + exception
-                );
+                    + exception);
             }
         }
 
-        private static void ReleaseSessionGuard(GuardSession session)
+        private static void ReleaseSessionGuard(
+            GuardSession session)
         {
             if (session == null
                 || !session.EnabledByThisPatch
@@ -226,11 +225,12 @@ namespace LobCorpWeaponExpansion
             {
                 if (GuardEnabledField != null)
                 {
-                    object value = GuardEnabledField.GetValue(avatar);
+                    object value =
+                        GuardEnabledField.GetValue(avatar);
 
-                    if (value is bool)
+                    if (value is bool fieldValue)
                     {
-                        enabled = (bool)value;
+                        enabled = fieldValue;
                         return true;
                     }
                 }
@@ -239,11 +239,13 @@ namespace LobCorpWeaponExpansion
                     && NetworkGuardEnabledProperty.CanRead)
                 {
                     object value =
-                        NetworkGuardEnabledProperty.GetValue(avatar, null);
+                        NetworkGuardEnabledProperty.GetValue(
+                            avatar,
+                            null);
 
-                    if (value is bool)
+                    if (value is bool propertyValue)
                     {
-                        enabled = (bool)value;
+                        enabled = propertyValue;
                         return true;
                     }
                 }
@@ -257,8 +259,7 @@ namespace LobCorpWeaponExpansion
                     Debug.LogWarning(
                         "[脑叶武器扩展] 无法读取角色真实格挡状态，"
                         + "本次不会修改格挡。详情："
-                        + exception
-                    );
+                        + exception);
                 }
 
                 return false;
@@ -270,8 +271,7 @@ namespace LobCorpWeaponExpansion
 
                 Debug.LogWarning(
                     "[脑叶武器扩展] 找不到 UnitAvatar 的格挡状态字段或属性，"
-                    + "自动格挡已安全跳过。请检查当前游戏版本的反编译结果。"
-                );
+                    + "自动格挡已安全跳过。请检查当前游戏版本的反编译结果。");
             }
 
             return false;
@@ -288,7 +288,8 @@ namespace LobCorpWeaponExpansion
     internal static class RedEyeConfessionAutoGuardStartPatch
     {
         [HarmonyPostfix]
-        private static void Postfix(WeaponSimple_SwordAndShield __instance)
+        private static void Postfix(
+            WeaponSimple_SwordAndShield __instance)
         {
             RedEyeConfessionAutoGuard.Begin(__instance);
         }
@@ -304,7 +305,8 @@ namespace LobCorpWeaponExpansion
     internal static class RedEyeConfessionAutoGuardEndPatch
     {
         [HarmonyPostfix]
-        private static void Postfix(WeaponSimple_SwordAndShield __instance)
+        private static void Postfix(
+            WeaponSimple_SwordAndShield __instance)
         {
             RedEyeConfessionAutoGuard.End(__instance);
         }

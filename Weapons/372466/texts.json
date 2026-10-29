@@ -20,6 +20,20 @@
       "zhTW": "赤瞳凝視罪人，懺悔則為其降下最後的判決。",
       "enUS": "The crimson eye watches the condemned; penance delivers the final verdict.",
       "jaJP": "赤き瞳は罪人を見据え、懺悔が最後の審判を下す。"
+    },
+    {
+      "key": "Tier2Name",
+      "zhCN": "<color=#C8402F>赤瞳</color>&<color=#C9A227>忏悔</color>·碎颅",
+      "zhTW": "<color=#C8402F>赤瞳</color>&<color=#C9A227>懺悔</color>·碎顱",
+      "enUS": "<color=#C8402F>Crimson Eye</color> & <color=#C9A227>Confession</color>: Skullcrush",
+      "jaJP": "<color=#C8402F>赤瞳</color>&<color=#C9A227>懺悔</color・粉砕"
+    },
+    {
+      "key": "Tier2",
+      "zhCN": "保留第一阶段的全部效果。\n每次成功命中获得 10 点能量；成功格挡获得 20 点能量，并获得 8 点护盾（完美格挡为 16 点）。\n能量上限 100 点，护盾上限 60 点。\n格挡状态下使用特殊攻击发动「碎颅」：消耗 100 点能量，使本次特殊攻击伤害提高 100%。",
+      "zhTW": "保留第一階段的全部效果。\n每次成功命中獲得 10 點能量；成功格擋獲得 20 點能量，並獲得 8 點護盾（完美格擋為 16 點）。\n能量上限 100 點，護盾上限 60 點。\n格擋狀態下使用特殊攻擊發動「碎顱」：消耗 100 點能量，使本次特殊攻擊傷害提高 100%。",
+      "enUS": "Retains all Tier 1 effects.\nGain 10 energy per successful hit and 20 energy per successful guard. Guards also grant 8 shield, or 16 on a perfect guard.\nEnergy is capped at 100 and shield at 60.\nWhile guarding, use Special Attack to activate Skullcrush: consume 100 energy to increase this special attack's damage by 100%.",
+      "jaJP": "第1段階のすべての効果を引き継ぐ。\n攻撃命中時にエネルギーを10獲得し、ガード成功時に20獲得する。ガード成功時はシールドも8獲得し、ジャストガードでは16獲得する。\nエネルギー上限は100、シールド上限は60。\nガード中に特殊攻撃を使用すると「粉砕」を発動し、エネルギーを100消費して特殊攻撃ダメージが100%増加する。"
     }
   ]
 }

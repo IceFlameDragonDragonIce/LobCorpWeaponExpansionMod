@@ -13,17 +13,14 @@ namespace LobCorpWeaponExpansion
 
         internal static bool IsTarget(WeaponSimple weapon)
         {
-            return weapon != null
-                && RedEyeConfessionWeapon.RegisteredWeaponId >= 0
-                && weapon.entityId ==
-                    RedEyeConfessionWeapon.RegisteredWeaponId;
+            return RedEyeConfessionWeapon.IsManagedWeapon(weapon);
         }
 
         internal static int GetCurrentSwing(
             WeaponControllerSimple owner)
         {
-            if (owner == null ||
-                CurrentWeaponSwingField == null)
+            if (owner == null
+                || CurrentWeaponSwingField == null)
             {
                 return -1;
             }
@@ -71,9 +68,9 @@ namespace LobCorpWeaponExpansion
             // 0、1 对应第一段；
             // 2、3 对应第二段；
             // 4、5 对应第三段。
-            if (original != null &&
-                original.Length >= 3 &&
-                original.Length < 6)
+            if (original != null
+                && original.Length >= 3
+                && original.Length < 6)
             {
                 NewWeaponFireData[] comboData =
                     new NewWeaponFireData[6];
@@ -93,9 +90,9 @@ namespace LobCorpWeaponExpansion
     }
 
     /// <summary>
-    /// 第一段仅执行索引 0；
-    /// 第二段仅执行索引 2；
-    /// 第三段保留索引 4 和 5。
+    /// 第一段只执行索引 0；
+    /// 第二段只执行索引 2；
+    /// 第三段执行索引 4 和 5。
     /// </summary>
     [HarmonyPatch]
     internal static class RedEyeConfessionTwinAttackEventPatch
@@ -112,14 +109,15 @@ namespace LobCorpWeaponExpansion
             WeaponSimple __instance,
             object[] __args)
         {
+            // 仅处理赤瞳＆忏悔的基础版与强化版。
             if (!RedEyeConfessionTwinComboHelper.IsTarget(__instance))
             {
                 return true;
             }
 
-            if (__args == null ||
-                __args.Length == 0 ||
-                !(__args[0] is int index))
+            if (__args == null
+                || __args.Length == 0
+                || !(__args[0] is int index))
             {
                 return true;
             }
@@ -135,8 +133,8 @@ namespace LobCorpWeaponExpansion
             // 第二段：保留 2，抑制 3。
             // 第三段：保留 4、5。
             bool skip =
-                (swing == 0 && index == 1) ||
-                (swing == 1 && index == 3);
+                (swing == 0 && index == 1)
+                || (swing == 1 && index == 3);
 
             return !skip;
         }

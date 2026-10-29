@@ -6,44 +6,90 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectFile = Join-Path $projectRoot 'LobCorpWeaponExpansion.csproj'
 
 if ([string]::IsNullOrWhiteSpace($GameDir)) {
     $GameDir = 'D:\Steam\steamapps\common\Sephiria'
 }
+
 $gameManaged = Join-Path $GameDir 'Sephiria_Data\Managed'
+
 if (-not (Test-Path -LiteralPath (Join-Path $gameManaged 'Assembly-CSharp.dll'))) {
-    throw "找不到 Assembly-CSharp.dll。请使用 -GameDir 指定 Sephiria 安装目录。当前目录：$GameDir"
+    throw "找不到 Assembly-CSharp.dll。请检查 GameDir：$GameDir"
 }
 
-& dotnet build $projectFile -c $Configuration "-p:SephiriaGameDir=$GameDir"
+if (-not (Test-Path -LiteralPath (Join-Path $gameManaged '0Harmony.dll'))) {
+    throw "找不到游戏内置的 0Harmony.dll：$gameManaged"
+}
+
+& dotnet build $projectFile -c $Configuration "-p:GameDir=$GameDir"
+
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet build 失败，退出代码：$LASTEXITCODE"
 }
 
-$assembly = Join-Path $projectRoot "bin\$Configuration\netstandard2.1\LobCorpWeaponExpansion.dll"
+$assembly = Join-Path $projectRoot "bin\$Configuration\LobCorpWeaponExpansion.dll"
+
 if (-not (Test-Path -LiteralPath $assembly)) {
-    throw "构建成功但找不到 DLL：$assembly"
+    throw "构建完成后找不到 DLL：$assembly"
 }
 
-$nugetRoot = if (-not [string]::IsNullOrWhiteSpace($env:NUGET_PACKAGES)) {
-    $env:NUGET_PACKAGES
-} else {
-    Join-Path ([Environment]::GetFolderPath('UserProfile')) '.nuget\packages'
-}
-$harmony = Join-Path $nugetRoot 'lib.harmony\2.4.2\lib\net472\0Harmony.dll'
-if (-not (Test-Path -LiteralPath $harmony)) {
-    throw "找不到 Harmony 依赖：$harmony。请确认 NuGet 包已成功还原。"
+$deployRoot = Join-Path $GameDir 'WorkshopLocal\lobcorp-weapon-expansion'
+$deployBin = Join-Path $deployRoot 'bin'
+$weaponDataSource = Join-Path $projectRoot 'Weapons\372466'
+$weaponDataTarget = Join-Path $deployBin 'Weapons\372466'
+
+New-Item -ItemType Directory -Force -Path $deployBin | Out-Null
+New-Item -ItemType Directory -Force -Path $weaponDataTarget | Out-Null
+
+Copy-Item -LiteralPath $assembly `
+    -Destination (Join-Path $deployBin 'LobCorpWeaponExpansion.dll') `
+    -Force
+
+Copy-Item -LiteralPath (Join-Path $projectRoot 'metadata.json') `
+    -Destination (Join-Path $deployRoot 'metadata.json') `
+    -Force
+
+$assetFiles = @(
+    'manifest.json',
+    'texts.json',
+    'icon.png',
+    'main_hammer.png',
+    'offhand_hammer.png'
+)
+
+foreach ($fileName in $assetFiles) {
+    $source = Join-Path $weaponDataSource $fileName
+
+    if (-not (Test-Path -LiteralPath $source)) {
+        throw "缺少武器资源：$source"
+    }
+
+    Copy-Item -LiteralPath $source `
+        -Destination (Join-Path $weaponDataTarget $fileName) `
+        -Force
 }
 
-# 此项目本身位于 <Sephiria安装目录>\AddOns\脑叶武器扩展，因此直接把 DLL 复制到项目目录。
-# 不要再生成 dist\AddOns\脑叶武器扩展 的嵌套副本，以免部署到错误位置。
-$deployFolder = $projectRoot
-Copy-Item -LiteralPath $assembly -Destination (Join-Path $deployFolder 'LobCorpWeaponExpansion.dll') -Force
-Copy-Item -LiteralPath $harmony -Destination (Join-Path $deployFolder '0Harmony.dll') -Force
+# 清理旧版部署遗留文件。
+# 新版 DLL 只应位于 bin/ 中，且不应打包游戏自带的 Harmony。
+$obsoletePaths = @(
+    (Join-Path $deployRoot 'LobCorpWeaponExpansion.dll'),
+    (Join-Path $deployRoot '0Harmony.dll'),
+    (Join-Path $deployBin '0Harmony.dll')
+)
+
+foreach ($obsoletePath in $obsoletePaths) {
+    if (Test-Path -LiteralPath $obsoletePath) {
+        Remove-Item -LiteralPath $obsoletePath -Force
+        Write-Host "已清理旧文件：$obsoletePath"
+    }
+}
 
 Write-Host ''
-Write-Host '构建完成。AddOn 文件已部署到：' -ForegroundColor Green
-Write-Host $deployFolder
-Write-Host '确认此目录同时包含 metadata.json、LobCorpWeaponExpansion.dll 和 0Harmony.dll。'
+Write-Host '构建与部署完成：' -ForegroundColor Green
+Write-Host $deployRoot
+Write-Host ''
+Write-Host '已部署 metadata.json、DLL 和 Weapons/372466 运行资源。'
+Write-Host '没有将游戏内置的 0Harmony.dll 打包进模组。'

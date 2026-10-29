@@ -1,7 +1,32 @@
 {
-  "modName": "脑叶武器扩展",
-  "modVersion": "0.1.0",
-  "modAuthor": "DragonIce·FrostFire",
-  "dllFile": "LobCorpWeaponExpansion.dll",
-  "entryClass": "LobCorpWeaponExpansion.LobCorpWeaponExpansionMod"
+  "info": {
+    "title": {
+      "zh-CN": "脑叶武器扩展",
+      "en-US": "LobCorp Weapon Expansion"
+    },
+    "description": {
+      "zh-CN": "为 Sephiria 添加赤瞳&忏悔武器及相关战斗机制。",
+      "en-US": "Adds Red Eye & Confession and related combat mechanics to Sephiria."
+    }
+  },
+  "tags": [
+    "Weapon",
+    "Gameplay"
+  ],
+  "mod": {
+    "schemaVersion": 1,
+    "modId": "dragonice.lobcorp-weapon-expansion",
+    "version": "0.2.0",
+    "author": "DragonIce·FrostFire",
+    "multiplayer": {
+      "installation": "everyone"
+    },
+    "modules": [
+      {
+        "type": "dll",
+        "path": "bin/LobCorpWeaponExpansion.dll",
+        "entryClass": "LobCorpWeaponExpansion.LobCorpWeaponExpansionMod"
+      }
+    ]
+  }
 }

@@ -6,21 +6,21 @@ namespace LobCorpWeaponExpansion
 {
     internal static class RedEyeConfessionCombatPatchHelper
     {
-        // 两道斩击的角度偏移，可在实际测试后调整。
+        // 两道斩击的角度偏移。
         internal const float DualSwingAngle = 18f;
 
+        // 同时识别基础版和强化版。
         internal static bool IsTargetWeapon(WeaponSimple weapon)
         {
-            return weapon != null
-                && RedEyeConfessionWeapon.RegisteredWeaponId >= 0
-                && weapon.entityId ==
-                    RedEyeConfessionWeapon.RegisteredWeaponId;
+            return RedEyeConfessionWeapon.IsManagedWeapon(weapon);
         }
     }
 
     /// <summary>
-    /// 第三段普通攻击改为两次独立的攻击判定。
-    /// 注意：这不会改变角色本身的动画片段。
+    /// 旧版最后一段双重攻击补丁。
+    /// 双锤版本使用 0～5 的动画事件索引，
+    /// 第三段的两次攻击由 TwinCombo 和 TwinStagger 负责。
+    /// 因此不能再次接管双锤的最后一段。
     /// </summary>
     [HarmonyPatch(
         typeof(WeaponControllerSimple),
@@ -34,35 +34,54 @@ namespace LobCorpWeaponExpansion
             int idx)
         {
             if (__instance == null)
+            {
                 return true;
+            }
+
+            WeaponSimple currentWeapon = __instance.currentWeapon;
+
+            // 不是赤瞳＆忏悔的武器，完全交给原版。
+            if (!RedEyeConfessionCombatPatchHelper.IsTargetWeapon(
+                    currentWeapon))
+            {
+                return true;
+            }
+
+            // 双锤使用 0～5 的动画事件索引。
+            // 不能在这里再次复制第三段攻击。
+            if (currentWeapon.animatorLayer == 2)
+            {
+                return true;
+            }
 
             WeaponSimple_SwordAndShield weapon =
-                __instance.currentWeapon as WeaponSimple_SwordAndShield;
+                currentWeapon as WeaponSimple_SwordAndShield;
 
-            // 双锤动画已经使用 0～5 的事件索引。
-            // 原版 finalComboIdx 通常为 2，但双锤第二段的第一个事件也是 idx=2。
-            // 不能再把这个事件误判成最后一段并额外生成两次攻击。
-            if (!RedEyeConfessionCombatPatchHelper.IsTargetWeapon(weapon) ||
-                weapon.animatorLayer == 2)
+            if (weapon == null)
             {
                 return true;
             }
 
             // 只接管最后一段，其余攻击继续走原版流程。
             if (idx != weapon.finalComboIdx)
+            {
                 return true;
+            }
 
-            NewWeaponFireData fxData = weapon.GetBasicAttack(idx, "");
+            NewWeaponFireData fxData =
+                weapon.GetBasicAttack(idx, "");
 
             if (fxData == null)
+            {
                 return true;
+            }
 
             try
             {
                 float angle =
                     RedEyeConfessionCombatPatchHelper.DualSwingAngle;
 
-                // 客户端生成两道有角度差的斩击特效。
+                // 两道斩击特效。
                 weapon.CreateSwingFx(
                     fxData,
                     true,
@@ -111,17 +130,15 @@ namespace LobCorpWeaponExpansion
                     __instance.OnBaisAttackSwing?.Invoke(idx);
                 }
 
-                // 阻止原版再创建第三次、普通的单次攻击。
+                // 阻止原版再创建一次普通攻击。
                 return false;
             }
             catch (Exception exception)
             {
                 Debug.LogError(
-                    "[脑叶武器扩展] 第三段双重攻击失败："
+                    "[脑叶武器扩展] 最后一段双重攻击失败："
                     + exception);
 
-                // 已开始执行自定义流程时，不再回退执行原版攻击，
-                // 避免异常发生在第一次命中后又追加普通攻击。
                 return false;
             }
         }
@@ -129,7 +146,6 @@ namespace LobCorpWeaponExpansion
 
     /// <summary>
     /// 赤瞳＆忏悔的普通攻击动画速度额外提高 15%。
-    /// 不修改角色的基础攻击速度属性。
     /// </summary>
     [HarmonyPatch(
         typeof(WeaponControllerSimple),
@@ -141,20 +157,28 @@ namespace LobCorpWeaponExpansion
         private static void Postfix(
             WeaponControllerSimple __instance)
         {
-            if (__instance == null || __instance.animator == null)
+            if (__instance == null
+                || __instance.animator == null)
+            {
                 return;
+            }
 
             if (!RedEyeConfessionCombatPatchHelper.IsTargetWeapon(
                     __instance.currentWeapon))
+            {
                 return;
+            }
 
-            // 不把施法动画也当作武器普通攻击加速。
+            // 不把施法动画当作普通攻击加速。
             if (__instance.IsCastAnimationRunning)
+            {
                 return;
+            }
 
             try
             {
-                int hash = AnimHashContainer.Instance.AttachSpeedHash;
+                int hash =
+                    AnimHashContainer.Instance.AttachSpeedHash;
 
                 float currentSpeed =
                     __instance.animator.GetFloat(hash);

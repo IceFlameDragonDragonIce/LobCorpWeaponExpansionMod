@@ -68,9 +68,7 @@ namespace LobCorpWeaponExpansion.Weapons
         {
             WeaponSimple weapon = GetCurrentWeapon(controller);
 
-            return weapon != null &&
-                   weapon.entityId ==
-                       RedEyeConfessionWeapon.RegisteredWeaponId;
+            return RedEyeConfessionWeapon.IsManagedWeapon(weapon);
         }
 
         private static string GetTwinClipName(int fireId)

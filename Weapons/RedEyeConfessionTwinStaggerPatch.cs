@@ -61,11 +61,12 @@ namespace LobCorpWeaponExpansion
                 return true;
             }
 
-            // 只处理服务器端的第三段第二次攻击。
-            if (!NetworkServer.active ||
-                __instance == null ||
-                __args == null ||
-                __args.Length < 6)
+            // 只处理本模组的武器。
+            if (!NetworkServer.active
+                || __instance == null
+                || !RedEyeConfessionWeapon.IsManagedWeapon(__instance)
+                || __args == null
+                || __args.Length < 6)
             {
                 return true;
             }
